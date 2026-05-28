@@ -13,7 +13,6 @@
         #screen1 { justify-content: center; align-items: center; background-color: #FFFFF0; }
         h1 { font-size: 1.8rem; color: #333; text-align: center; margin-bottom: 30px; }
         
-        /* 성향 선택 버튼 스타일 */
         .disp-box { text-align: center; margin-bottom: 40px; }
         .disp-title { font-weight: bold; color: #5F8575; margin-bottom: 10px; }
         .disp-btn { background-color: #eee; border: 2px solid #ccc; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; margin: 0 5px; transition: 0.2s; }
@@ -30,7 +29,9 @@
         
         .log-item { font-size: 0.95rem; color: #444; margin-bottom: 12px; line-height: 1.4; border-bottom: 1px dashed rgba(0,0,0,0.1); padding-bottom: 8px; }
         .log-time { font-weight: bold; color: #5F8575; border-bottom: none; margin-top: 15px; }
-        .log-status { font-size: 0.85rem; background-color: #E8F0EA; color: #333; padding: 12px; border-radius: 8px; margin: 15px 0; white-space: pre-wrap; border-left: 4px solid #5F8575; line-height: 1.5; }
+        
+        /* 9시 로그 가독성을 높이기 위해 스타일 약간 수정 */
+        .log-status { font-size: 0.82rem; background-color: #E8F0EA; color: #333; padding: 12px; border-radius: 8px; margin: 15px 0; white-space: pre-wrap; border-left: 4px solid #5F8575; line-height: 1.6; font-family: monospace;}
         
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); z-index: 10; display: none; justify-content: center; align-items: center; }
         #overlay.active { display: flex; }
@@ -172,7 +173,7 @@
         }
 
         // ==========================================
-        // 3. 캐릭터 시스템 (상태이상, 메모리, 성향, 기택 AI 추가)
+        // 3. 캐릭터 시스템
         // ==========================================
         class CharacterManager {
             constructor() {
@@ -181,7 +182,6 @@
                     _hunger: 0, _stomach: 0, _fatigue: 0, affection: affection, antipathy: antipathy,
                     isSleeping: false, sleepTimer: 0, cooldowns: { glance: 0 }, lastLocation: null,
                     travelTimeLeft: 0, destination: null,
-                    // [신규] 상태이상 및 AI 전용 변수
                     statuses: { affectionSat: 0, hatredSat: 0, drunk: 0, shame: 0 },
                     affectionAccCount: 0, memory: [], gitaekState: { doneToday: false, timer: 0 }
                 });
@@ -198,7 +198,6 @@
                 ];
             }
 
-            // [신규] 초기 성향 세팅 함수
             setJihyeDisposition(type) {
                 this.jihye.disposition = type;
                 if (type === "고상함") {
@@ -216,11 +215,10 @@
             getCharacter(id) { return id === "jihye" ? this.jihye : this.npcs.find(n => n.id === id); }
             getActiveNPCs(currentDateState) { return this.npcs.filter(npc => npc.isActive(this.jihye, currentDateState)); }
             
-            // [수정] 지혜 스탯 증감 시 방어/소모 보정 적용
             modifyJihyeStat(statName, amount) { 
                 if (amount < 0 && this.jihye.modifiers) {
-                    if (this.jihye.modifiers.drain === statName) amount *= 2; // 빠른 소모
-                    if (this.jihye.modifiers.defense === statName) amount = Math.ceil(amount / 2); // 방어 반감
+                    if (this.jihye.modifiers.drain === statName) amount *= 2; 
+                    if (this.jihye.modifiers.defense === statName) amount = Math.ceil(amount / 2); 
                 }
                 this.jihye[statName] = this.clamp(this.jihye[statName] + amount, statName === "_normalcy" ? -100 : -10, 100); 
             }
@@ -230,7 +228,7 @@
         }
 
         // ==========================================
-        // 4. 턴 엔진 (행동 로직 고도화 및 내러티브 로그 개편)
+        // 4. 턴 엔진
         // ==========================================
         class TurnEngine {
             constructor(calendarSys, characterSys, placeSys) {
@@ -327,13 +325,25 @@
 
             pickAction(pool) { return pool[Math.floor(Math.random() * pool.length)]; }
 
-            generateStatusReport(activeChars) {
-                let lines = ["📢 [현재 활동 캐릭터 관계도 정보]"]; 
-                activeChars.forEach(char => {
+            // [수정] 9시 로그 개편 (전체 인물 수치 공개 및 지혜 스탯)
+            generateStatusReport() {
+                let allChars = [this.chars.jihye, ...this.chars.npcs];
+                let lines = ["📢 [매일 아침 9시: 상태 및 관계도 브리핑]"];
+                
+                lines.push(`🔹 [지혜 상태] 건강: ${this.chars.jihye._health} | 멘탈: ${this.chars.jihye._mental} | 정상사고: ${this.chars.jihye._normalcy}`);
+                lines.push("---------------------------------------");
+                
+                allChars.forEach(char => {
                     let affs = [], antis = [];
-                    for (const [t, v] of Object.entries(char.affection)) if(v>0) affs.push(this.chars.getCharacter(t).name);
-                    for (const [t, v] of Object.entries(char.antipathy)) if(v>0) antis.push(this.chars.getCharacter(t).name);
-                    lines.push(`- [${char.name}] 호감: ${affs.length>0 ? affs.join(", ") : "없음"} | 반감: ${antis.length>0 ? antis.join(", ") : "없음"}`);
+                    allChars.forEach(target => {
+                        if (char.id !== target.id) {
+                            affs.push(`${target.name}(${this.chars.getRelationship(char.id, 'affection', target.id)})`);
+                            antis.push(`${target.name}(${this.chars.getRelationship(char.id, 'antipathy', target.id)})`);
+                        }
+                    });
+                    lines.push(`[${char.name}]`);
+                    lines.push(` - 호감: ${affs.join(", ")}`);
+                    lines.push(` - 반감: ${antis.join(", ")}`);
                 });
                 return lines.join("\n");
             }
@@ -379,9 +389,22 @@
                     else if (primary.name === "요의") targetDest = this.findLocationWithTag("용변", char, timeState);
                     else if (primary.name === "수면욕") targetDest = this.findLocationWithTag("수면", char, timeState);
 
+                    // [수정] 미행 시 권한 체크 추가
                     if ((primary.name === "애욕" || primary.name === "증오") && primary.target) {
                         let targetChar = this.chars.getCharacter(primary.target);
-                        if (targetChar) targetDest = targetChar.destination || targetChar.currentLocation;
+                        if (targetChar) {
+                            let tDest = targetChar.destination || targetChar.currentLocation;
+                            let locObj = this.places.locations[tDest];
+                            let canEnter = true;
+                            
+                            if (locObj) {
+                                if (locObj.area === "E" && locObj.ownerId !== char.id) canEnter = false; // 격리구역 차단
+                                else if (locObj.ownerId && locObj.ownerId !== char.id) {
+                                    if (this.chars.getRelationship(locObj.ownerId, 'affection', char.id) < 40) canEnter = false; // 사유지 차단
+                                }
+                            }
+                            if (canEnter) targetDest = tDest;
+                        }
                     }
 
                     if (char.currentLocation !== targetDest && char.travelTimeLeft <= 0) {
@@ -407,12 +430,10 @@
                 let jihyeActionText = "", jihyeWokeUp = false;
                 let npcActionTexts = [];
 
-                // --- [신규/수정] 침대 및 화장실 점유율 추적 객체 ---
                 let occupiedItems = {}; 
                 const isOccupied = (loc, item) => occupiedItems[loc] && occupiedItems[loc].includes(item);
                 const setOccupy = (loc, item) => { if(!occupiedItems[loc]) occupiedItems[loc] = []; occupiedItems[loc].push(item); };
 
-                // 전 턴부터 자고 있던 사람들의 침대 점유 등록
                 activeChars.forEach(char => {
                     let occ = intents[char.id];
                     if (occ.isSleepingTick && occ.sleepType === "침대" && !occ.wokeUp) {
@@ -444,7 +465,6 @@
                             actionResult = `사유는 다가와 속삭였다. "${gossip}"`;
                         }
                         else if (primary.name === "수면욕") {
-                            // 현재 방에 있는 침대 개수와 사용 중인 침대 수 비교
                             let bedCount = itemsInRoom.filter(i => i.tags.includes("수면") && !i.isHidden && i.name.includes("침대")).length;
                             let usedBeds = occupiedItems[locName] ? occupiedItems[locName].filter(tag => tag.includes("침대")).length : 0;
                             
@@ -467,7 +487,7 @@
                                 if (char._stomach > 80) {
                                     char.statuses.shame = 3;
                                     char._stomach = 0;
-                                    actionResult = `${char.name}은(는) 바닥에서 용변을 봤다.`;
+                                    actionResult = `${char.name}은(는) 바닥에 용변을 봤다.`;
                                 } else {
                                     actionResult = `${char.name}은(는) ${locName}에서 시간을 보냈다.`;
                                 }
@@ -488,12 +508,10 @@
                                 actionResult = `${char.name}은(는) ${locName}에서 시간을 보냈다.`;
                             }
                         }
-                        // --- [수정] 수면 중인 상대방에 대한 예외 처리 강화 ---
                         else if (primary.name === "애욕" && primary.target) {
                             let targetOcc = intents[primary.target];
                             if (targetOcc && targetOcc.char.currentLocation === locName && targetOcc.char.travelTimeLeft <= 0) {
                                 if (targetOcc.isSleepingTick) {
-                                    // 타겟이 자고 있을 때
                                     actionResult = `[${targetOcc.char.name}]에게 다가갔으나, 잠들어 있어 바라보기만 했다.`;
                                 } else {
                                     let aff = this.chars.getRelationship(char.id, 'affection', primary.target);
@@ -519,7 +537,6 @@
                             let targetOcc = intents[primary.target];
                             if (targetOcc && targetOcc.char.currentLocation === locName && targetOcc.char.travelTimeLeft <= 0) {
                                 if (targetOcc.isSleepingTick) {
-                                    // 타겟이 자고 있을 때
                                     actionResult = `잠든 [${targetOcc.char.name}]을(를) 적대적으로 노려보았다.`;
                                 } else {
                                     let anti = this.chars.getRelationship(char.id, 'antipathy', primary.target);
@@ -556,10 +573,9 @@
                     if (char.id === "jihye") jihyeActionText = actionResult;
                     else {
                         if (!isLocChanged && !occ.isSleepingTick && char.travelTimeLeft <= 0) {
-                            if (char.lastLocation !== jihyeLoc && char.currentLocation === jihyeLoc) npcActionTexts.push(`${char.name}은(는) ${jihyeLoc}로 이동했다.`);
-                            else if (char.lastLocation === jihyeLoc && char.currentLocation !== jihyeLoc) npcActionTexts.push(`${char.name}은(는) 다른 곳으로 이동했다.`);
+                            if (char.lastLocation !== jihyeLoc && char.currentLocation === jihyeLoc) npcActionTexts.push(`🚶 [${char.name}]이(가) 방금 들어왔다.`);
+                            else if (char.lastLocation === jihyeLoc && char.currentLocation !== jihyeLoc) npcActionTexts.push(`🚪 [${char.name}]이(가) 밖으로 나갔다.`);
                         }
-                        
                         if (isJihyeRoom && actionResult && char.travelTimeLeft <= 0 && !actionResult.includes("에서 시간을 보냈다")) {
                             if (occ.wokeUp) npcActionTexts.push(`☀️ ${char.name}은(는) 잠에서 깼다.`);
                             npcActionTexts.push(actionResult);
@@ -588,7 +604,7 @@
                 let logs = [];
 
                 logs.push({ type: 'time', text: `=== [${tick.timeState.year}년차 ${tick.timeState.month}월 ${tick.timeState.day}일] ${tick.fakeTimeStr} ===` });
-                if (tick.is9AM) logs.push({ type: 'status', text: this.generateStatusReport(tick.activeChars) });
+                if (tick.is9AM) logs.push({ type: 'status', text: this.generateStatusReport() });
                 
                 if (tick.isLocChanged) {
                     logs.push({ type: 'log', text: `지혜는 ${tick.location}로 이동했다.` });
@@ -604,7 +620,7 @@
         }
 
         // ==========================================
-        // 5. DOM 및 이벤트 바인딩 (성향 선택 포함)
+        // 5. DOM 및 이벤트 바인딩
         // ==========================================
         const screen1 = document.getElementById('screen1'); const screen2 = document.getElementById('screen2');
         const overlay = document.getElementById('overlay'); const startBtn = document.getElementById('start-btn');
@@ -614,24 +630,23 @@
         const characterSys = new CharacterManager();
         const gameEngine = new TurnEngine(new GameCalendar(), characterSys, new PlaceManager());
 
-        const frame1 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADPElEQVR4AexZMY7UQBDsvhcAAn6ARM4TSCBEAmJ0b4CAgIQAhMgJTmgRCQE8AJ6CRESEBBI8wbjWLsk7t3P2eapnLa1XW2pPT09Nd/WMg92TzWbTHDNO7Mg/qwBHfgBsPQHrCaiswI+vn20KaqW1XoFaSrPrU/e7bPxU3jRuPQGpIupxaSdL14/Vs56AMYXmzqs7p+ZjXesJoBIqG9Up5qfmP7oTQCFpqwnw6t0nA7gxnoF0DB9Af7StJkB0IXP5wwV4/eWbAX7jmgF4Bpgwug1gbgjEAIyLsuECRCWu4pUJkHs7N3/+2j6kBeyLgS+NU49lAqgTq8UnFwD3GWABw3uNZ7t+1bZgQG8xN8Q2BrH9fGpyJy6NGxvLBRjbcGnzcgHYRZwCIC3Y3c3dU/e5sbtv48ABnAsQOeQCiPKqRiMX4PmjewbwJPw7O7Mh8GYH0grh2wfypPGqsVwAVWK1eMIFuPLgoQ2hKuzW/ccGlPKFC1CaYPR6mQDoBsCE8R4AcneYflquo6UfHAD9aisTQJ2Yim+MJ1wAdA9gR5lQ+sann3FYA9AfZcMFiEpcxVtNAHQTYIdzFjGAqsAxnmoCjCVyqPlwAX7dvmtDpHef4ycv3hrA2FqChAtQq5C5+4QJgN/zgLmJ8SSAA5jLM7YuTICxjZcyLxcA3QJwn4EPL58a8ObjdwN+33lmgPUfPAOYAxAL9NPWNM0W4AToV1m5AKrEavEcTAB0HZhaaNRJOJgAUwuPjpMJcHp6agA7hXsM5Aq4+fO9Abn5Wn6ZALUSVu9TLAC6DrDz7t2vuWmi6PYQ7l3c0IdnrsPpATim5T7YE6B/ri0WYO7GUesuy1tdAPeu81MTdd+Nd98dT+XJxVUXIJfIofwyAdy7zvCO5griPG0ujn7GuXf8rd97tKb8KxOgPJXDMCxeAHff/kfYyuM9mtYCrSn/Ll6A8hIvZlisAO6+t/P8BenisqbPLlaA6SWURcoEYGfcu86579o0Tfdunn733THf/u087ntD/nYs/coEkGZVkSxMAHaQNq0p9afjND5qHCZAVMJq3jAB3HfvtDpxFV+YAKoEo3nkAkS9raOEkAsQlWiOt9T/HwAA///vEiDpAAAABklEQVQDACMxZC+LDHfjAAAAAElFTkSuQmCC";
-        const frame2 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADRElEQVR4AexZMY7UQBDsvhcAAn6ARM4TSCBEAmK0b4CAgIQAhMgJTmgRCQE8AJ6CRESEBBL3BJ9r7ZK8cztnn109trQ+bal3uts13dUzDvZOttttdcw4sSP/WwU48gNg6wlYT0BhBX59/2pDUKqs9QqUUppTH7rfVfOH8qZ56wlIFVGvp05y6vN9/awnoE+hsXH15NR87Gs9AVRCZaMmxfrU/Ed3AigkbTEB3nz4YgA3xncgXcMH0B9tiwkQ3chY/nAB3n77YYDfumEAvgMsGNMGEOsCOQDzomy4AFGFq3hlAuTeztW//3YIaQOHcuBL89RrmQDqwkrxyQXAfQbYQPde47vdvG47MKG1iHWxy0FuG09N7sSleX1ruQB9Gy4tLheAU8QpANKG3d3cPXVfWLv7Lg8cwIUEkUMugKiuYjRyAV4+eWAAT8LZ6al1gTc7kHYI3yGQJ81XreUCqAorxRMuwLVHj62L3ERz/pwQdx4+NSAXH+oPF2BoIXPlyQTANAA2gvcAkE6W95x+Wvr5PP3gAOhXW5kA6sJUfH084QJgegAnyoI4cVr6mYdnAPqjbLgAUYWreIsJgGkCnHDOIgdQNdjHU0yAvkLmiocL8OfufeuCdz61z169N4C5pQQJF6BUI2P3CRMAv+cBYwvjSQAHMJan77kwAfo2XkpcLgCmBeA+A59ePzfg3eefBvy998IAa//wHUAMQC7Qhq2qqh3ACdCvsnIBVIWV4plNAEwdGNpo1EmYTYChjUfnyQTYbDYGcFK4x0Cugdu/PxqQi5fyywQoVbB6n8kCYOoAJ+/e/JqbFoppd+He5HV9+M7ncHoArmm5D/YE6B9rJwswduOo567KW1wA92byQwt13893318P5cnlFRcgV8hcfpkA7s1keEdzDTFOm8ujn3nuDX/t9xa1mf6RCTC9lHkYFi+Au+/+R1jL4y2q2gK1mf5ZvADTW7ycYbECuPvByfOXpMvbGh5drADDW5iWKROAk3FvJue+b9My3Zs4/e77a7796zjue0X+ei39yASQVlWQLEwATpA27Sn1p+s0P2odJkBUwWreMAHc9++0unAVX5gAqgKjeeQCRL2to4SQCxBVaI53qv8cAAD//xWLJWIAAAAGSURBVAMAFCxwL9ygUI0AAAAASUVORK5CYII=";
+        const frame1 = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='%23e74c3c'/></svg>";
+        const frame2 = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='%233498db'/></svg>";
         animImg.src = frame1; let isFrame1 = true;
         setInterval(() => { animImg.src = (isFrame1 = !isFrame1) ? frame1 : frame2; }, 500);
 
-        // 성향 선택 버튼 처리
         let selectedDisposition = null;
         document.querySelectorAll('.disp-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 document.querySelectorAll('.disp-btn').forEach(b => b.classList.remove('selected'));
                 e.target.classList.add('selected');
                 selectedDisposition = e.target.getAttribute('data-type');
-                startBtn.style.display = 'block'; // 선택 후 시작버튼 표시
+                startBtn.style.display = 'block'; 
             });
         });
 
         startBtn.addEventListener('click', () => {
-            characterSys.setJihyeDisposition(selectedDisposition); // 초기 성향 반영
+            characterSys.setJihyeDisposition(selectedDisposition); 
             screen1.classList.remove('active'); screen2.classList.add('active');
             bottomBox.innerHTML = '<div class="log-item">SYSTEM: 로그 시스템 가동... 하단 박스를 터치하여 [1시간] 단위로 진행하세요.</div>';
         });
