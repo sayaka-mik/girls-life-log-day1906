@@ -283,7 +283,7 @@
                 if (validPlaces.length === 0) return tag === "수면" ? "길거리" : "편의점B";
                 validPlaces.sort((a, b) => a.cost - b.cost);
                 let minCost = validPlaces[0].cost;
-                return validPlaces.filter(p => p.cost === minCost)[0].key; // 최단거리 중 첫번째
+                return validPlaces.filter(p => p.cost === minCost)[0].key;
             }
 
             getFakeTime(hour, minute) {
@@ -300,7 +300,6 @@
                 const isWeekday = !["토", "일"].includes(timeState.dow);
                 const hour = timeState.hour;
                 
-                // [신규] 기택 AI: 일과 외 시간엔 학원 3시간 공부 우선
                 if (char.id === "gitaek" && !char.gitaekState.doneToday) {
                     let inSchoolTime = isWeekday && hour >= 9 && hour < 16;
                     if (!inSchoolTime) desires.push({ name: "학원루틴", score: 100, target: null });
@@ -316,7 +315,6 @@
                 let maxAnti = 0, targetEnemy = null;
                 for (const [t, v] of Object.entries(char.antipathy)) if (v > maxAnti) { maxAnti = v; targetEnemy = t; }
                 
-                // [신규] 상태이상에 따른 감정행동 제한 (만취 시 무시)
                 if (char.statuses.drunk <= 0) {
                     if (char.statuses.affectionSat > 0) maxAff = 0;
                     if (char.statuses.hatredSat > 0) maxAnti = 0;
@@ -330,7 +328,7 @@
             pickAction(pool) { return pool[Math.floor(Math.random() * pool.length)]; }
 
             generateStatusReport(activeChars) {
-                let lines = ["📢 [현재 활동 캐릭터 관계도 정보]"]; // 숫자 없이 이름만 출력
+                let lines = ["📢 [현재 활동 캐릭터 관계도 정보]"]; 
                 activeChars.forEach(char => {
                     let affs = [], antis = [];
                     for (const [t, v] of Object.entries(char.affection)) if(v>0) affs.push(this.chars.getCharacter(t).name);
@@ -347,15 +345,13 @@
                 const activeChars = [this.chars.jihye, ...this.chars.getActiveNPCs(timeState)];
                 let intents = {};
 
-                // 자정 기택 리셋
                 if (this.lastDayIndex !== this.calendar.currentDayIndex) {
                     activeChars.forEach(c => { if (c.gitaekState) c.gitaekState.doneToday = false; });
                     this.lastDayIndex = this.calendar.currentDayIndex;
                 }
 
-                // 1. 상태이상 틱 처리 및 욕망 결정
+                // 1. 상태이상 틱 처리 및 목적지 탐색
                 activeChars.forEach(char => {
-                    // 상태이상 시간 감소
                     if (char.statuses.affectionSat > 0) char.statuses.affectionSat--;
                     if (char.statuses.hatredSat > 0) char.statuses.hatredSat--;
                     if (char.statuses.drunk > 0) char.statuses.drunk--;
@@ -410,13 +406,19 @@
                 
                 let jihyeActionText = "", jihyeWokeUp = false;
                 let npcActionTexts = [];
-                let roomOccupants = activeChars.map(c => intents[c.id]).filter(o => o.char.currentLocation === jihyeLoc);
-                let otherNames = roomOccupants.filter(o => o.char.id !== "jihye" && !o.isSleepingTick && o.char.travelTimeLeft <= 0).map(o => o.char.name);
 
-                // 장소 점유물 현황 객체
+                // --- [신규/수정] 침대 및 화장실 점유율 추적 객체 ---
                 let occupiedItems = {}; 
                 const isOccupied = (loc, item) => occupiedItems[loc] && occupiedItems[loc].includes(item);
                 const setOccupy = (loc, item) => { if(!occupiedItems[loc]) occupiedItems[loc] = []; occupiedItems[loc].push(item); };
+
+                // 전 턴부터 자고 있던 사람들의 침대 점유 등록
+                activeChars.forEach(char => {
+                    let occ = intents[char.id];
+                    if (occ.isSleepingTick && occ.sleepType === "침대" && !occ.wokeUp) {
+                        setOccupy(char.currentLocation, "침대_" + char.id); 
+                    }
+                });
 
                 // 2. 행동 실행 및 내러티브 로그 수집
                 activeChars.forEach(char => {
@@ -437,16 +439,17 @@
                         let locObj = this.places.locations[locName];
                         let itemsInRoom = locObj ? locObj.items : [];
 
-                        // --- [신규] 사유 호사가 로직 (최우선 발동) ---
                         if (char.id === "sayu" && isJihyeRoom && char.memory.length > 0) {
                             let gossip = char.memory.shift();
                             actionResult = `사유는 다가와 속삭였다. "${gossip}"`;
                         }
-                        // --- 공통 행동 로직 ---
                         else if (primary.name === "수면욕") {
-                            let bed = itemsInRoom.find(i => i.tags.includes("수면") && !i.isHidden && i.name.includes("침대"));
-                            if (bed && !isOccupied(locName, "침대")) {
-                                setOccupy(locName, "침대");
+                            // 현재 방에 있는 침대 개수와 사용 중인 침대 수 비교
+                            let bedCount = itemsInRoom.filter(i => i.tags.includes("수면") && !i.isHidden && i.name.includes("침대")).length;
+                            let usedBeds = occupiedItems[locName] ? occupiedItems[locName].filter(tag => tag.includes("침대")).length : 0;
+                            
+                            if (bedCount > usedBeds) {
+                                setOccupy(locName, "침대_" + char.id);
                                 char.isSleeping = true; char.sleepTimer = 6; char.sleepType = "침대";
                             } else {
                                 char.isSleeping = true; char.sleepTimer = 3; char.sleepType = "노상";
@@ -485,38 +488,49 @@
                                 actionResult = `${char.name}은(는) ${locName}에서 시간을 보냈다.`;
                             }
                         }
+                        // --- [수정] 수면 중인 상대방에 대한 예외 처리 강화 ---
                         else if (primary.name === "애욕" && primary.target) {
-                            let targetOcc = activeChars.find(o => o.id === primary.target && o.currentLocation === locName && !o.isSleepingTick && o.travelTimeLeft <= 0);
-                            if (targetOcc) {
-                                let aff = this.chars.getRelationship(char.id, 'affection', primary.target);
-                                let actionName = aff <= 30 ? this.pickAction(["가벼운 눈인사", "곁눈질"]) : aff <= 50 ? this.pickAction(["살가운 인사", "대화 시도"]) : this.pickAction(["고백", "스킨십"]);
-                                
-                                let reactScore = this.chars.getRelationship(primary.target, 'affection', char.id) - this.chars.getRelationship(primary.target, 'antipathy', char.id);
-                                let reactTxt = "무덤덤한";
-                                if (reactScore > 0) {
-                                    reactTxt = "기분 좋은";
-                                    char.affectionAccCount++;
-                                    if(char.affectionAccCount >= 2) { char.statuses.affectionSat = 4; char.affectionAccCount = 0; }
-                                } else if (reactScore < 0) {
-                                    reactTxt = "불쾌한";
+                            let targetOcc = intents[primary.target];
+                            if (targetOcc && targetOcc.char.currentLocation === locName && targetOcc.char.travelTimeLeft <= 0) {
+                                if (targetOcc.isSleepingTick) {
+                                    // 타겟이 자고 있을 때
+                                    actionResult = `[${targetOcc.char.name}]에게 다가갔으나, 잠들어 있어 바라보기만 했다.`;
+                                } else {
+                                    let aff = this.chars.getRelationship(char.id, 'affection', primary.target);
+                                    let actionName = aff <= 30 ? this.pickAction(["가벼운 눈인사", "곁눈질"]) : aff <= 50 ? this.pickAction(["살가운 인사", "대화 시도"]) : this.pickAction(["고백", "스킨십"]);
+                                    
+                                    let reactScore = this.chars.getRelationship(primary.target, 'affection', char.id) - this.chars.getRelationship(primary.target, 'antipathy', char.id);
+                                    let reactTxt = "무덤덤한";
+                                    if (reactScore > 0) {
+                                        reactTxt = "기분 좋은";
+                                        char.affectionAccCount++;
+                                        if(char.affectionAccCount >= 2) { char.statuses.affectionSat = 4; char.affectionAccCount = 0; }
+                                    } else if (reactScore < 0) {
+                                        reactTxt = "불쾌한";
+                                    }
+                                    let targetName = targetOcc.char.name;
+                                    actionResult = `${char.name}은(는) ${targetName}에게 ${actionName}을(를) 했다.\n   -> ${targetName}은(는) 기분이 ${reactTxt === "기분 좋은" ? "좋아졌다" : (reactTxt === "불쾌한" ? "나빠졌다" : "그대로다")}.`;
                                 }
-                                let targetName = this.chars.getCharacter(primary.target).name;
-                                actionResult = `${char.name}은(는) ${targetName}에게 ${actionName}을(를) 했다.\n   -> ${targetName}은(는) 기분이 ${reactTxt === "기분 좋은" ? "좋아졌다" : (reactTxt === "불쾌한" ? "나빠졌다" : "그대로다")}.`;
                             } else {
                                 actionResult = `${char.name}은(는) ${locName}에서 시간을 보냈다.`;
                             }
                         }
                         else if (primary.name === "증오" && primary.target) {
-                            let targetOcc = activeChars.find(o => o.id === primary.target && o.currentLocation === locName && !o.isSleepingTick && o.travelTimeLeft <= 0);
-                            if (targetOcc) {
-                                let anti = this.chars.getRelationship(char.id, 'antipathy', primary.target);
-                                let actionName = anti <= 30 ? this.pickAction(["비난", "무시"]) : anti <= 50 ? this.pickAction(["회피", "거절"]) : this.pickAction(["뺨때리기", "침뱉기"]);
-                                
-                                char.statuses.hatredSat = 3;
-                                if (primary.target === "jihye" && this.chars.jihye.statuses.shame > 0) this.chars.modifyJihyeStat('_mental', -5);
-                                
-                                let targetName = this.chars.getCharacter(primary.target).name;
-                                actionResult = `${char.name}은(는) ${targetName}에게 ${actionName}을(를) 했다.\n   -> ${targetName}은(는) 기분이 나빠졌다.`;
+                            let targetOcc = intents[primary.target];
+                            if (targetOcc && targetOcc.char.currentLocation === locName && targetOcc.char.travelTimeLeft <= 0) {
+                                if (targetOcc.isSleepingTick) {
+                                    // 타겟이 자고 있을 때
+                                    actionResult = `잠든 [${targetOcc.char.name}]을(를) 적대적으로 노려보았다.`;
+                                } else {
+                                    let anti = this.chars.getRelationship(char.id, 'antipathy', primary.target);
+                                    let actionName = anti <= 30 ? this.pickAction(["비난", "무시"]) : anti <= 50 ? this.pickAction(["회피", "거절"]) : this.pickAction(["뺨때리기", "침뱉기"]);
+                                    
+                                    char.statuses.hatredSat = 3;
+                                    if (primary.target === "jihye" && this.chars.jihye.statuses.shame > 0) this.chars.modifyJihyeStat('_mental', -5);
+                                    
+                                    let targetName = targetOcc.char.name;
+                                    actionResult = `${char.name}은(는) ${targetName}에게 ${actionName}을(를) 했다.\n   -> ${targetName}은(는) 기분이 나빠졌다.`;
+                                }
                             } else {
                                 actionResult = `${char.name}은(는) ${locName}에서 시간을 보냈다.`;
                             }
@@ -539,7 +553,6 @@
                         }
                     }
 
-                    // --- 지혜 관점 로그 필터 및 호사가 메모리 저장 ---
                     if (char.id === "jihye") jihyeActionText = actionResult;
                     else {
                         if (!isLocChanged && !occ.isSleepingTick && char.travelTimeLeft <= 0) {
@@ -551,7 +564,6 @@
                             if (occ.wokeUp) npcActionTexts.push(`☀️ ${char.name}은(는) 잠에서 깼다.`);
                             npcActionTexts.push(actionResult);
                         } else if (!isJihyeRoom && (occ.primary && (occ.primary.name === "애욕" || occ.primary.name === "증오")) && actionResult.includes("에게")) {
-                            // 지혜가 없는 방에서 벌어진 사건을 사유가 기억함
                             let sayuObj = this.chars.getCharacter("sayu");
                             if (sayuObj && sayuObj.currentLocation === locName && sayuObj.travelTimeLeft <= 0) {
                                 let match = actionResult.match(/은\(는\) (.*?)에게 (.*?)을\(를\) 했다/);
@@ -565,7 +577,7 @@
 
                 return {
                     fakeTimeStr: fakeTimeStr, timeState: timeState, is9AM: (timeState.timeStr === "09:00"),
-                    location: jihyeLoc, isLocChanged: isLocChanged, otherNames: otherNames,
+                    location: jihyeLoc, isLocChanged: isLocChanged,
                     jihyeAction: jihyeActionText, jihyeWokeUp: jihyeWokeUp,
                     npcActions: npcActionTexts, activeChars: activeChars
                 };
@@ -580,7 +592,6 @@
                 
                 if (tick.isLocChanged) {
                     logs.push({ type: 'log', text: `지혜는 ${tick.location}로 이동했다.` });
-                    if (tick.otherNames.length > 0) logs.push({ type: 'log', text: `[${tick.otherNames.join(", ")}]이(가) ${tick.location}에 있다.` });
                 }
 
                 if (!tick.jihyeAction.includes("로 이동했다")) logs.push({ type: 'log', text: tick.jihyeAction });
