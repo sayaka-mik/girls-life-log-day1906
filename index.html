@@ -10,12 +10,10 @@
         .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; box-sizing: border-box; }
         .active { display: flex; }
         
-        /* 화면 1 */
         #screen1 { justify-content: center; align-items: center; background-color: #FFFFF0; }
         h1 { font-size: 1.8rem; color: #333; text-align: center; margin-bottom: 50px; }
         #start-btn { background-color: #808080; color: white; border: none; padding: 15px 40px; font-size: 1.2rem; border-radius: 8px; cursor: pointer; font-weight: bold; }
         
-        /* 화면 2 */
         #screen2 { background-color: #FFFFF0; padding: 15px; gap: 15px; }
         #top-box { flex: 3; background-color: #5F8575; border-radius: 16px; position: relative; display: flex; justify-content: center; align-items: center; }
         #bottom-box { flex: 7; background-color: #F5F5DC; border-radius: 16px; padding: 20px; box-sizing: border-box; overflow-y: auto; touch-action: pan-y; cursor: pointer; }
@@ -23,11 +21,10 @@
         #gear-btn { position: absolute; top: 15px; right: 15px; font-size: 20px; background-color: #FFFFF0; border: 2px solid #333; border-radius: 8px; cursor: pointer; width: 38px; height: 38px; display: flex; justify-content: center; align-items: center; padding: 0; }
         #anim-img { width: 64px; height: 64px; object-fit: contain; image-rendering: pixelated; }
         
-        /* 로그 스타일 */
         .log-item { font-size: 0.95rem; color: #444; margin-bottom: 12px; line-height: 1.4; border-bottom: 1px dashed rgba(0,0,0,0.1); padding-bottom: 8px; }
         .log-time { font-weight: bold; color: #5F8575; border-bottom: none; margin-top: 15px; }
+        .log-status { font-size: 0.85rem; background-color: #E8F0EA; color: #333; padding: 12px; border-radius: 8px; margin: 15px 0; white-space: pre-wrap; border-left: 4px solid #5F8575; line-height: 1.5; }
         
-        /* 오버레이 */
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); z-index: 10; display: none; justify-content: center; align-items: center; }
         #overlay.active { display: flex; }
         .overlay-content { background-color: #fff; padding: 30px; border-radius: 12px; text-align: center; }
@@ -35,23 +32,18 @@
     </style>
 </head>
 <body>
-
     <div id="game-container">
         <div id="screen1" class="screen active">
             <h1>GIRLS LIFE LOG<br>D1906</h1>
             <button id="start-btn">게임 시작</button>
         </div>
-
         <div id="screen2" class="screen">
             <div id="top-box">
                 <button id="gear-btn">⚙️</button>
                 <img id="anim-img" alt="character animation">
             </div>
-            
-            <div id="bottom-box">
-                </div>
+            <div id="bottom-box"></div>
         </div>
-
         <div id="overlay">
             <div class="overlay-content">
                 <p style="margin-top:0;">시스템 메뉴</p>
@@ -62,34 +54,16 @@
 
     <script>
         // ==========================================
-        // 1. 게임 엔진 클래스 모음 (가장 먼저 선언)
+        // 1. 달력 시스템 (GameCalendar)
         // ==========================================
-
         class GameCalendar {
             constructor() {
                 this.DAYS_IN_MONTH = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-                this.currentDayIndex = 1; 
-                this.hour = 8;
-                this.minute = 0;
-                this.events = {}; 
+                this.currentDayIndex = 1; this.hour = 8; this.minute = 0; this.events = {}; 
                 for (let y = 1; y <= 3; y++) this.generateYearlyEvents(y);
             }
-            getDayIndex(year, month, day) {
-                let days = (year - 1) * 365;
-                for (let i = 1; i < month; i++) days += this.DAYS_IN_MONTH[i];
-                days += day;
-                return Math.min(days, 365 * 3); 
-            }
-            getDateFromIndex(index) {
-                let year = Math.floor((index - 1) / 365) + 1;
-                let remainder = (index - 1) % 365 + 1;
-                let month = 1;
-                while (remainder > this.DAYS_IN_MONTH[month]) {
-                    remainder -= this.DAYS_IN_MONTH[month];
-                    month++;
-                }
-                return { year, month, day: remainder };
-            }
+            getDayIndex(year, month, day) { let days = (year - 1) * 365; for (let i = 1; i < month; i++) days += this.DAYS_IN_MONTH[i]; return Math.min(days + day, 365 * 3); }
+            getDateFromIndex(index) { let y = Math.floor((index - 1) / 365) + 1, r = (index - 1) % 365 + 1, m = 1; while (r > this.DAYS_IN_MONTH[m]) { r -= this.DAYS_IN_MONTH[m]; m++; } return { year: y, month: m, day: r }; }
             getDOW(index) { return index % 7; }
             getDOWString(index) { return ["일", "월", "화", "수", "목", "금", "토"][this.getDOW(index)]; }
             getSeasonAndSunTimes(month) {
@@ -101,398 +75,459 @@
             getTimeZone(month, hour, minute) {
                 const { sunrise, sunset } = this.getSeasonAndSunTimes(month);
                 const nowMins = hour * 60 + minute;
-                const sunriseMins = sunrise.h * 60 + sunrise.m;
-                const sunsetMins = sunset.h * 60 + sunset.m;
-                const noonMins = 12 * 60;
-                if (nowMins >= sunriseMins && nowMins < noonMins) return "오전";
-                if (nowMins >= noonMins && nowMins < sunsetMins) return "오후";
+                if (nowMins >= sunrise.h * 60 + sunrise.m && nowMins < 12 * 60) return "오전";
+                if (nowMins >= 12 * 60 && nowMins < sunset.h * 60 + sunset.m) return "오후";
                 return "밤";
             }
-            addEvent(index, eventName) {
-                if (!this.events[index]) this.events[index] = [];
-                this.events[index].push(eventName);
-            }
-            getAdjustedFixedDate(y, m, d) {
-                let idx = this.getDayIndex(y, m, d);
-                let dow = this.getDOW(idx);
-                if (dow === 6) idx += 2; 
-                if (dow === 0) idx += 1; 
-                return idx;
-            }
-            getNthWeekday(y, m, n, targetDow) {
-                let startIdx = this.getDayIndex(y, m, 1);
-                let startDow = this.getDOW(startIdx);
-                let offset = (targetDow - startDow + 7) % 7;
-                return startIdx + offset + (n - 1) * 7;
-            }
-            getLastWeekday(y, m, targetDow) {
-                let lastDay = this.DAYS_IN_MONTH[m];
-                let endIdx = this.getDayIndex(y, m, lastDay);
-                let endDow = this.getDOW(endIdx);
-                let offset = (endDow - targetDow + 7) % 7;
-                return endIdx - offset;
-            }
+            addEvent(index, eventName) { if (!this.events[index]) this.events[index] = []; this.events[index].push(eventName); }
+            getAdjustedFixedDate(y, m, d) { let idx = this.getDayIndex(y, m, d), dow = this.getDOW(idx); return dow === 6 ? idx + 2 : dow === 0 ? idx + 1 : idx; }
+            getNthWeekday(y, m, n, targetDow) { let startIdx = this.getDayIndex(y, m, 1), offset = (targetDow - this.getDOW(startIdx) + 7) % 7; return startIdx + offset + (n - 1) * 7; }
+            getLastWeekday(y, m, targetDow) { let endIdx = this.getDayIndex(y, m, this.DAYS_IN_MONTH[m]), offset = (this.getDOW(endIdx) - targetDow + 7) % 7; return endIdx - offset; }
             generateYearlyEvents(y) {
                 this.addEvent(this.getAdjustedFixedDate(y, 3, 2), y === 1 ? "신입학" : "개학");
-                let aprLastMon = this.getLastWeekday(y, 4, 1);
-                for(let i=0; i<5; i++) this.addEvent(aprLastMon + i, "중간고사");
+                for(let i=0; i<5; i++) this.addEvent(this.getLastWeekday(y, 4, 1) + i, "중간고사");
                 this.addEvent(this.getNthWeekday(y, 5, 3, 3), "운동회");
-                let junLastMon = this.getLastWeekday(y, 6, 1);
-                for(let i=0; i<5; i++) this.addEvent(junLastMon + i, "기말고사");
+                for(let i=0; i<5; i++) this.addEvent(this.getLastWeekday(y, 6, 1) + i, "기말고사");
                 this.addEvent(this.getNthWeekday(y, 7, 2, 5), "여름방학 시작");
                 this.addEvent(this.getAdjustedFixedDate(y, 9, 1), "개학");
                 this.addEvent(this.getAdjustedFixedDate(y, 9, 2), "개교기념일");
                 this.addEvent(this.getAdjustedFixedDate(y, 10, 8), "교내 글짓기 대회");
-                let octSecondMon = this.getNthWeekday(y, 10, 2, 1);
-                for(let i=0; i<5; i++) this.addEvent(octSecondMon + i, "중간고사");
+                for(let i=0; i<5; i++) this.addEvent(this.getNthWeekday(y, 10, 2, 1) + i, "중간고사");
                 this.addEvent(this.getLastWeekday(y, 10, 3), "학교 축제");
-                let novSecondMon = this.getNthWeekday(y, 11, 2, 1);
-                for(let i=0; i<5; i++) this.addEvent(novSecondMon + i, "기말고사");
+                for(let i=0; i<5; i++) this.addEvent(this.getNthWeekday(y, 11, 2, 1) + i, "기말고사");
                 this.addEvent(this.getNthWeekday(y, 12, 2, 5), "겨울방학 시작");
-
-                if (y === 1) {
-                    let maySecondWed = this.getNthWeekday(1, 5, 2, 3);
-                    this.addEvent(maySecondWed, "수련회 (1일차)");
-                    this.addEvent(maySecondWed + 1, "수련회 (2일차)");
-                } else if (y === 2) {
-                    let sepThirdWed = this.getNthWeekday(2, 9, 3, 3);
-                    this.addEvent(sepThirdWed, "수학여행 (1일차)");
-                    this.addEvent(sepThirdWed + 1, "수학여행 (2일차)");
-                } else if (y === 3) {
-                    let novLastMon = this.getLastWeekday(3, 11, 1);
-                    this.addEvent(novLastMon, "졸업여행 (1일차)");
-                    this.addEvent(novLastMon + 1, "졸업여행 (2일차)");
-                    this.addEvent(novLastMon + 2, "졸업여행 (3일차)");
-                }
-
-                const anniversaries = [
-                    {m: 2, d: 14, name: "발렌타인 데이"}, {m: 3, d: 14, name: "화이트데이"},
-                    {m: 11, d: 11, name: "빼빼로데이"}, {m: 12, d: 25, name: "크리스마스"},
-                    {m: 5, d: 5, name: "지혜 생일"}, {m: 10, d: 17, name: "사유 생일"},
-                    {m: 2, d: 28, name: "기택 생일"}
-                ];
-                anniversaries.forEach(ann => {
-                    let idx = this.getDayIndex(y, ann.m, ann.d);
-                    this.addEvent(idx, ann.name);
-                });
+                [{m:2,d:14,n:"발렌타인데이"},{m:3,d:14,n:"화이트데이"},{m:11,d:11,n:"빼빼로데이"},{m:12,d:25,n:"크리스마스"},{m:5,d:5,n:"지혜생일"},{m:10,d:17,n:"사유생일"},{m:2,d:28,n:"기택생일"}].forEach(a => this.addEvent(this.getDayIndex(y, a.m, a.d), a.n));
             }
             getCurrentState() {
                 const { year, month, day } = this.getDateFromIndex(this.currentDayIndex);
-                const dow = this.getDOWString(this.currentDayIndex);
-                const { season } = this.getSeasonAndSunTimes(month);
-                const timeZone = this.getTimeZone(month, this.hour, this.minute);
-                return {
-                    year, month, day, dow, season, timeZone,
-                    timeStr: `${this.hour.toString().padStart(2, '0')}:${this.minute.toString().padStart(2, '0')}`,
-                    events: this.events[this.currentDayIndex] || []
-                };
-            }
-            nextDay() {
-                if (this.currentDayIndex < 365 * 3) {
-                    this.currentDayIndex++;
-                    return true;
-                }
-                return false;
+                return { year, month, day, dow: this.getDOWString(this.currentDayIndex), ...this.getSeasonAndSunTimes(month), timeZone: this.getTimeZone(month, this.hour, this.minute), timeStr: `${this.hour.toString().padStart(2, '0')}:${this.minute.toString().padStart(2, '0')}`, events: this.events[this.currentDayIndex] || [] };
             }
             addMinutes(mins) {
                 this.minute += mins;
                 while (this.minute >= 60) { this.minute -= 60; this.hour++; }
-                while (this.hour >= 24) { this.hour -= 24; this.nextDay(); }
+                while (this.hour >= 24) { this.hour -= 24; if (this.currentDayIndex < 365 * 3) this.currentDayIndex++; }
             }
         }
 
+        // ==========================================
+        // 2. 장소 관리 (에리어 추가)
+        // ==========================================
         class PlaceManager {
             constructor() {
                 this.locations = {
-                    "집": { name: "집", isReachable: true, items: [{ name: "낡은 침대", tags: ["수면"], isHidden: false }, { name: "텅 빈 어항", tags: [], isHidden: false }, { name: "가위", tags: ["위협"], isHidden: false }, { name: "유통기한 지난 향수", tags: ["치장"], isHidden: false }] },
-                    "길거리": { name: "길거리(통로)", isReachable: true, items: [{ name: "돌멩이", tags: [], isHidden: false }, { name: "돗대", tags: ["일탈"], isHidden: false }, { name: "전단지", tags: [], isHidden: false }, { name: "담배꽁초", tags: [], isHidden: false }, { name: "5천원", tags: [], isHidden: true }] },
-                    "학교": { name: "학교", isReachable: true, items: [{ name: "책상", tags: [], isHidden: false }, { name: "의자", tags: [], isHidden: false }, { name: "일기장", tags: [], isHidden: true }] },
-                    "운동장": { name: "학교 운동장", isReachable: true, items: [{ name: "모래", tags: [], isHidden: false }, { name: "송곳", tags: ["위협"], isHidden: true }] },
-                    "옥상": { name: "학교 옥상", isReachable: true, items: [{ name: "담배꽁초", tags: [], isHidden: false }, { name: "비눗방울", tags: ["행복"], isHidden: true }, { name: "죽은 고양이", tags: ["기현상"], isHidden: true }] },
-                    "편의점": { name: "편의점", isReachable: true, items: [{ name: "에너지 드링크", tags: ["음료"], isHidden: false }, { name: "햄버거", tags: ["음식"], isHidden: false }, { name: "컵라면", tags: ["음식"], isHidden: false }, { name: "삼각김밥", tags: ["음식"], isHidden: false }, { name: "콜라", tags: ["음료"], isHidden: false }, { name: "캔커피", tags: ["음료"], isHidden: false }, { name: "프로틴 드링크", tags: ["음료", "건강"], isHidden: false }, { name: "캔맥주", tags: ["음료", "일탈"], isHidden: false }, { name: "아이스바", tags: ["음식", "피서"], isHidden: false }, { name: "병소주", tags: ["음료", "일탈", "위협"], isHidden: false }, { name: "빼빼로", tags: ["음식", "로맨틱"], isHidden: false }, { name: "초콜렛", tags: ["음식", "로맨틱"], isHidden: false }, { name: "필기구", tags: ["학용품"], isHidden: false }] },
-                    "도서관": { name: "도서관", isReachable: true, items: [{ name: "죄와 벌", tags: ["책", "어려운 책"], isHidden: false }, { name: "방주로 오세요", tags: ["책", "재밌는 책"], isHidden: false }, { name: "돈키호테", tags: ["책", "이상한 책"], isHidden: false }, { name: "인간실격", tags: ["책", "기괴한 책"], isHidden: false }, { name: "루루에 관하여", tags: ["저널"], isHidden: false }] },
-                    "폐건물": { name: "폐건물", isReachable: true, items: [{ name: "깨진 유리조각", tags: ["위협"], isHidden: false }, { name: "거미줄", tags: [], isHidden: false }, { name: "더러운 봉제인형", tags: ["로맨틱", "기현상"], isHidden: false }, { name: "수상한 지갑", tags: ["위협"], isHidden: false }, { name: "악의적인 트랩", tags: ["위협"], isHidden: true }] },
-                    "지하철역": { name: "지하철역", isReachable: true, items: [{ name: "삐라", tags: ["일탈"], isHidden: false }, { name: "떨어진 모자", tags: [], isHidden: false }] },
-                    "서점": { name: "서점", isReachable: true, items: [{ name: "소설", tags: ["책"], isHidden: false }, { name: "잡지", tags: ["책"], isHidden: false }, { name: "만화", tags: ["책"], isHidden: false }, { name: "필기구", tags: ["학용품"], isHidden: false }, { name: "노트", tags: ["학용품"], isHidden: false }] },
-                    "레스토랑": { name: "레스토랑", isReachable: true, items: [{ name: "스테이크", tags: ["음식"], isHidden: false }, { name: "스프", tags: ["음식"], isHidden: false }, { name: "샐러드바", tags: ["음식"], isHidden: false }] },
-                    "유원지": { name: "유원지", isReachable: true, items: [{ name: "관람차", tags: ["행복"], isHidden: false }, { name: "다트", tags: ["행복"], isHidden: false }, { name: "인형뽑기", tags: ["행복"], isHidden: false }] },
-                    "뒷산": { name: "뒷산", isReachable: true, items: [{ name: "고라니", tags: ["위협"], isHidden: false }, { name: "나뭇잎", tags: [], isHidden: false }, { name: "쥐덫", tags: ["위협"], isHidden: false }] },
-                    "공터": { name: "공터", isReachable: true, items: [{ name: "파이프", tags: ["위협"], isHidden: false }, { name: "렌치", tags: ["위협"], isHidden: false }, { name: "축구공", tags: [], isHidden: false }] },
-                    "사유의집": { name: "사유의 집", isReachable: true, items: [{ name: "사유의 일기장", tags: ["학용품"], isHidden: false }, { name: "귀여운 침대", tags: ["수면"], isHidden: false }] },
-                    "헬스장": { name: "헬스장", isReachable: true, items: [{ name: "런닝머신", tags: [], isHidden: false }, { name: "덤벨", tags: [], isHidden: false }, { name: "무료 프로틴", tags: ["음료"], isHidden: false }] },
-                    "천체관측소": { name: "천체관측소", isReachable: true, items: [{ name: "플라네타리움 기계", tags: ["럭셔리"], isHidden: false }] },
-                    "화장실": { name: "화장실", isReachable: true, items: [{ name: "변기", tags: [], isHidden: false }, { name: "세면대", tags: [], isHidden: false }] },
-                    "외계인의집": { name: "울툼쿠라피(외계인)의 집", isReachable: false, items: [{ name: "안티키테라 기계", tags: ["기현상"], isHidden: false }] },
-                    "선사시대": { name: "선사시대", isReachable: false, items: [{ name: "운석조각", tags: ["기현상"], isHidden: false }, { name: "공룡울음녹음본", tags: ["기현상"], isHidden: false }] },
-                    "우주의끝": { name: "우주의 끝", isReachable: false, items: [{ name: "별의 소리", tags: ["기현상"], isHidden: false }] },
-                    "지옥": { name: "지옥", isReachable: false, items: [{ name: "원죄 자국", tags: ["기현상"], isHidden: false }] }
+                    // --- 길거리 (공용 통로) ---
+                    "길거리": { area: "Street", name: "길거리(통로)", isReachable: true, items: [{ name: "돌멩이", tags: [] }, { name: "돗대", tags: ["일탈"] }, { name: "전단지", tags: [] }, { name: "담배꽁초", tags: [] }, { name: "5천원", tags: [], isHidden: true }] },
+                    
+                    // --- Area A ---
+                    "다빈의 집": { area: "A", name: "다빈의 집", ownerId: "dabin", isReachable: true, items: [{ name: "침대", tags: ["수면"] }, { name: "화장실", tags: ["용변"] }, { name: "밥", tags: ["음식", "무한"] }] },
+                    "유상의 집": { area: "A", name: "유상의 집", ownerId: "yusang", isReachable: true, items: [{ name: "침대", tags: ["수면"] }, { name: "화장실", tags: ["용변"] }, { name: "밥", tags: ["음식", "무한"] }] },
+                    "학교": { area: "A", name: "학교", isReachable: true, items: [{ name: "책상", tags: ["공부"] }, { name: "의자", tags: [] }, { name: "일기장", tags: [], isHidden: true }] },
+                    "운동장": { area: "A", name: "학교 운동장", isReachable: true, items: [{ name: "모래", tags: [] }, { name: "송곳", tags: ["위협"], isHidden: true }] },
+                    "옥상": { area: "A", name: "학교 옥상", isReachable: true, items: [{ name: "담배꽁초", tags: [] }, { name: "비눗방울", tags: ["럭셔리"], isHidden: true }, { name: "죽은 고양이", tags: ["기현상"], isHidden: true }] },
+                    "급식실": { area: "A", name: "학교 급식실", isReachable: true, items: [{ name: "급식", tags: ["음식"] }] },
+                    "남자화장실": { area: "A", name: "학교 남자화장실", isReachable: true, items: [{ name: "화장실", tags: ["용변", "남자"] }] },
+                    "여자화장실": { area: "A", name: "학교 여자화장실", isReachable: true, items: [{ name: "화장실", tags: ["용변", "여자"] }] },
+
+                    // --- Area B ---
+                    "지혜의 집": { area: "B", name: "지혜의 집", ownerId: "jihye", isReachable: true, items: [{ name: "낡은 침대", tags: ["수면"] }, { name: "텅 빈 어항", tags: [] }, { name: "가위", tags: ["위협"] }, { name: "유통기한 지난 향수", tags: ["치장"] }, { name: "화장실", tags: ["용변"] }, { name: "밥", tags: ["음식", "무한"] }] },
+                    "사유의 집": { area: "B", name: "사유의 집", ownerId: "sayu", isReachable: true, items: [{ name: "사유의 일기장", tags: ["학용품"] }, { name: "귀여운 침대", tags: ["수면"] }, { name: "화장실", tags: ["용변"] }, { name: "밥", tags: ["음식", "무한"] }] },
+                    "기택의 집": { area: "B", name: "기택의 집", ownerId: "gitaek", isReachable: true, items: [{ name: "침대", tags: ["수면"] }, { name: "화장실", tags: ["용변"] }, { name: "밥", tags: ["음식", "무한"] }] },
+                    "편의점B": { area: "B", name: "편의점B", isReachable: true, items: [{ name: "햄버거", tags: ["음식"] }, { name: "삼각김밥", tags: ["음식"] }, { name: "콜라", tags: ["음료"] }, { name: "캔맥주", tags: ["음료", "일탈"] }] },
+                    "뒷산": { area: "B", name: "뒷산", isReachable: true, items: [{ name: "고라니", tags: ["위협"] }, { name: "쥐덫", tags: ["위협"] }] },
+                    "공터": { area: "B", name: "공터", isReachable: true, items: [{ name: "파이프", tags: ["위협"] }, { name: "축구공", tags: [] }] },
+
+                    // --- Area C ---
+                    "미나의 집": { area: "C", name: "미나의 집", ownerId: "mina", isReachable: true, items: [{ name: "침대", tags: ["수면"] }, { name: "화장실", tags: ["용변"] }, { name: "밥", tags: ["음식", "무한"] }] },
+                    "신우의 집": { area: "C", name: "신우의 집", ownerId: "shinwoo", isReachable: true, items: [{ name: "침대", tags: ["수면"] }, { name: "화장실", tags: ["용변"] }, { name: "밥", tags: ["음식", "무한"] }] },
+                    "도서관": { area: "C", name: "도서관", isReachable: true, items: [{ name: "죄와 벌", tags: ["어려운 책", "공부"] }, { name: "인간실격", tags: ["기괴한 책"] }] },
+                    "지하철역": { area: "C", name: "지하철역", isReachable: true, items: [{ name: "삐라", tags: ["일탈"] }] },
+                    "서점": { area: "C", name: "서점", isReachable: true, items: [{ name: "소설", tags: ["학용품"] }] },
+                    "레스토랑": { area: "C", name: "레스토랑", isReachable: true, items: [{ name: "스테이크", tags: ["음식"] }] },
+                    "유원지": { area: "C", name: "유원지", isReachable: true, items: [{ name: "관람차", tags: ["행복"] }] },
+                    "헬스장": { area: "C", name: "헬스장", isReachable: true, items: [{ name: "런닝머신", tags: [] }, { name: "무료 프로틴", tags: ["음료"] }] },
+
+                    // --- Area D ---
+                    "폐건물": { area: "D", name: "폐건물", isReachable: true, items: [{ name: "깨진 유리조각", tags: ["위협"] }, { name: "더러운 봉제인형", tags: ["로맨틱", "기현상"] }] },
+                    "편의점D": { area: "D", name: "편의점D", isReachable: true, items: [{ name: "햄버거", tags: ["음식"] }, { name: "콜라", tags: ["음료"] }] },
+                    "천체관측소": { area: "D", name: "천체관측소", isReachable: true, items: [{ name: "플라네타리움", tags: ["럭셔리"] }] },
+
+                    // --- Area E (격리구역) ---
+                    "앨리스의 집": { area: "E", name: "앨리스의 집", ownerId: "alice", isReachable: false, items: [{ name: "침대", tags: ["수면"] }, { name: "화장실", tags: ["용변"] }, { name: "밥", tags: ["음식", "무한"] }] },
+                    "기택의 학원": { area: "E", name: "기택의 학원", ownerId: "gitaek", isReachable: true, items: [{ name: "문제집", tags: ["공부"] }] },
+                    "외계인의 집": { area: "E", name: "울툼쿠라피의 집", isReachable: false, items: [{ name: "안티키테라 기계", tags: ["기현상"] }] },
+                    "지옥": { area: "E", name: "지옥", isReachable: false, items: [{ name: "원죄 자국", tags: ["기현상"] }] }
                 };
             }
         }
 
+        // ==========================================
+        // 3. 캐릭터 시스템 (성별, 이동 변수 추가)
+        // ==========================================
         class CharacterManager {
             constructor() {
                 this.clamp = (val, min, max) => Math.max(min, Math.min(max, val));
-                const initSharedStats = (affection = {}, antipathy = {}) => ({
-                    _hunger: 0, _stomach: 0, _fatigue: 0, affection: affection, antipathy: antipathy
+                const initStats = (affection = {}, antipathy = {}) => ({
+                    _hunger: 0, _stomach: 0, _fatigue: 0, affection: affection, antipathy: antipathy,
+                    isSleeping: false, sleepTimer: 0, cooldowns: { glance: 0 }, lastLocation: null,
+                    travelTimeLeft: 0, destination: null // [신규] 이동 관련 변수
                 });
 
-                this.jihye = {
-                    id: "jihye", name: "하지혜", info: "고등학교 1학년, 여자", preferredLocation: ["집"],
-                    _health: 100, _mental: 100, _normalcy: 100,
-                    ...initSharedStats({ sayu: 20, gitaek: 50, dabin: 5 }, { sayu: 0, gitaek: 5, dabin: 30 })
-                };
-
+                // 성별(gender) 판정 추가 (F: 여자, M: 남자)
+                this.jihye = { id: "jihye", name: "하지혜", gender: "F", preferredLocation: ["지혜의 집"], _health: 100, _mental: 100, _normalcy: 100, ...initStats({ sayu: 20, gitaek: 50, dabin: 5 }, { sayu: 0, gitaek: 5, dabin: 30 }) };
                 this.npcs = [
-                    { id: "sayu", name: "사유", relation: "동성친구", traits: ["호사가적"], preferredLocations: ["편의점"], mobility: "normal", isActive: () => true, ...initSharedStats({ jihye: 40, gitaek: 10, dabin: 10 }, {}) },
-                    { id: "gitaek", name: "기택", relation: "이성", traits: ["모범적", "짝사랑 대상", "지혜를 안 좋아함"], preferredLocations: ["지하철역"], mobility: "low_encounter", isActive: () => true, ...initSharedStats({ jihye: 0, sayu: 2, dabin: 40 }, { jihye: 30, sayu: 5, dabin: 0 }) },
-                    { id: "dabin", name: "다빈", relation: "동성", traits: ["일탈적", "기택의 짝사랑 대상"], preferredLocations: ["공터"], mobility: "normal", isActive: () => true, ...initSharedStats({ jihye: 10, sayu: 10, gitaek: 0 }, { jihye: 10, sayu: 10, gitaek: 50 }) },
-                    { id: "mina", name: "미나", relation: "지킴이", traits: ["태그"], preferredLocations: ["헬스장"], mobility: "patrol_all", isActive: (j) => j._health <= 40, ...initSharedStats({ jihye: 50 }, {}) },
-                    { id: "yusang", name: "유상", relation: "건달", traits: ["태그"], preferredLocations: ["폐건물", "편의점"], mobility: "normal", isActive: (j) => j._mental <= 40, ...initSharedStats({ jihye: 30 }, { jihye: 30 }) },
-                    { id: "alice", name: "앨리스", relation: "이상현상", traits: ["태그"], preferredLocations: ["천체관측소"], mobility: "patrol_slow", isActive: (j) => j._normalcy <= 50, ...initSharedStats({ jihye: 60 }, { jihye: 0 }) },
-                    { id: "shinwoo", name: "신우", relation: "이성", traits: ["지혜를 짝사랑"], preferredLocations: ["학교"], mobility: "patrol_all", isActive: (j, d) => {
-                        if (d.year > 2) return true;
-                        if (d.year === 2 && d.month > 3) return true;
-                        if (d.year === 2 && d.month === 3 && d.day >= 1) return true;
-                        return false;
-                    }, ...initSharedStats({ jihye: 50, sayu: 20, gitaek: 0, dabin: 30 }, { jihye: 0, sayu: 10, gitaek: 40, dabin: 0 }) }
+                    { id: "sayu", name: "사유", gender: "F", preferredLocations: ["편의점B"], isActive: () => true, ...initStats({ jihye: 40, gitaek: 10, dabin: 10 }, {}) },
+                    { id: "dabin", name: "다빈", gender: "F", preferredLocations: ["공터"], isActive: () => true, ...initStats({ jihye: 10, sayu: 10, gitaek: 0 }, { jihye: 10, sayu: 10, gitaek: 50 }) },
+                    { id: "mina", name: "미나", gender: "F", preferredLocations: ["헬스장"], isActive: (j) => j._health <= 40, ...initStats({ jihye: 50 }, {}) },
+                    { id: "alice", name: "앨리스", gender: "F", preferredLocations: ["천체관측소"], isActive: (j) => j._normalcy <= 50, ...initStats({ jihye: 60 }, {}) },
+                    { id: "gitaek", name: "기택", gender: "M", preferredLocations: ["지하철역"], isActive: () => true, ...initStats({ jihye: 0, sayu: 2, dabin: 40 }, { jihye: 30, sayu: 5, dabin: 0 }) },
+                    { id: "yusang", name: "유상", gender: "M", preferredLocations: ["폐건물"], isActive: (j) => j._mental <= 40, ...initStats({ jihye: 30 }, { jihye: 30 }) },
+                    { id: "shinwoo", name: "신우", gender: "M", preferredLocations: ["학교"], isActive: (j, d) => d.year > 2 || (d.year === 2 && d.month >= 3), ...initStats({ jihye: 50, sayu: 20, dabin: 30 }, { gitaek: 40 }) }
                 ];
             }
             getCharacter(id) { return id === "jihye" ? this.jihye : this.npcs.find(n => n.id === id); }
             getActiveNPCs(currentDateState) { return this.npcs.filter(npc => npc.isActive(this.jihye, currentDateState)); }
-            modifyJihyeStat(statName, amount) {
-                let maxVal = 100, minVal = statName === "_normalcy" ? -100 : -10;
-                this.jihye[statName] = this.clamp(this.jihye[statName] + amount, minVal, maxVal);
-            }
-            modifyVital(charId, statName, amount) {
-                let char = this.getCharacter(charId);
-                if (char) char[statName] = this.clamp(char[statName] + amount, 0, 100);
-            }
-            modifyRelationship(fromId, type, toId, amount) {
-                let char = this.getCharacter(fromId);
-                if (!char) return;
-                char[type][toId] = this.clamp((char[type][toId] || 0) + amount, type === "affection" ? -10 : 0, 100);
-            }
-            getRelationship(fromId, type, toId) {
-                let char = this.getCharacter(fromId);
-                return char && char[type][toId] ? char[type][toId] : 0;
-            }
+            modifyJihyeStat(statName, amount) { this.jihye[statName] = this.clamp(this.jihye[statName] + amount, statName === "_normalcy" ? -100 : -10, 100); }
+            modifyVital(charId, statName, amount) { let char = this.getCharacter(charId); if (char) char[statName] = this.clamp(char[statName] + amount, 0, 100); }
+            modifyRelationship(fromId, type, toId, amount) { let char = this.getCharacter(fromId); if (char) char[type][toId] = this.clamp((char[type][toId] || 0) + amount, type === "affection" ? -10 : 0, 100); }
+            getRelationship(fromId, type, toId) { let char = this.getCharacter(fromId); return char && char[type][toId] ? char[type][toId] : 0; }
         }
 
+        // ==========================================
+        // 4. 턴 엔진 (1시간 롤백 + 시간 페이크 + 스마트 거리 탐색)
+        // ==========================================
         class TurnEngine {
             constructor(calendarSys, characterSys, placeSys) {
                 this.calendar = calendarSys;
                 this.chars = characterSys;
                 this.places = placeSys;
+                this.lastJihyeLocation = null; 
             }
-            findLocationWithTag(tag) {
-                let possiblePlaces = [];
+
+            getAreaDistance(area1, area2) {
+                if (area1 === area2) return 0;
+                if (area1 === "Street" || area2 === "Street") return 0;
+                const map = { "A": 1, "B": 2, "C": 3, "D": 4, "E": 99 };
+                let d1 = map[area1], d2 = map[area2];
+                if (d1 === undefined || d2 === undefined) return 0;
+                if (area1 === "E" || area2 === "E") return 1;
+                return Math.abs(d1 - d2);
+            }
+            
+            // [스마트 탐색] 종속 장소 최우선 + 거리 점수 기반
+            findLocationWithTag(tag, char, timeState) {
+                let validPlaces = [];
+                let currLocName = char.currentLocation;
+                let currArea = this.places.locations[currLocName] ? this.places.locations[currLocName].area : "Street";
+
                 for (const [key, loc] of Object.entries(this.places.locations)) {
                     if (!loc.isReachable) continue;
-                    let hasTag = loc.items.some(item => item.tags.includes(tag) && !item.isHidden);
-                    if (hasTag) possiblePlaces.push(loc.name);
+
+                    if (loc.ownerId) {
+                        let ownerObj = this.chars.getCharacter(loc.ownerId);
+                        if (loc.ownerId !== "jihye" && ownerObj && ownerObj.isActive && !ownerObj.isActive(this.chars.jihye, timeState)) continue;
+                        if (loc.ownerId !== char.id && this.chars.getRelationship(loc.ownerId, 'affection', char.id) < 40) continue;
+                    }
+
+                    let hasTag = loc.items.some(item => {
+                        if (!item.tags.includes(tag) || item.isHidden) return false;
+                        if (tag === "용변") {
+                            if (item.tags.includes("남자") && char.gender === "F") return false;
+                            if (item.tags.includes("여자") && char.gender === "M") return false;
+                        }
+                        return true;
+                    });
+
+                    if (hasTag) {
+                        let targetArea = loc.area;
+                        let cost = 0;
+
+                        if (currLocName === key) {
+                            cost = -1; 
+                        } else {
+                            let dist = this.getAreaDistance(currArea, targetArea);
+                            if (dist === 0) {
+                                let currBase = currLocName.split(" ")[0]; 
+                                let targetBase = loc.name.split(" ")[0];  
+                                if (loc.name.includes(currLocName) || currLocName.includes(loc.name) || (currBase === targetBase && currBase.length > 1)) {
+                                    cost = 0.1; // 종속 장소 최우선
+                                } else {
+                                    cost = 0.5; // 같은 에리어의 다른 곳
+                                }
+                            } else {
+                                cost = dist; // 다른 에리어
+                            }
+                        }
+                        validPlaces.push({ key: key, cost: cost });
+                    }
                 }
-                if (possiblePlaces.length === 0) return tag === "수면" ? "길거리" : "편의점";
-                return possiblePlaces[Math.floor(Math.random() * possiblePlaces.length)];
+
+                if (validPlaces.length === 0) return tag === "수면" ? "길거리" : "편의점B";
+
+                validPlaces.sort((a, b) => a.cost - b.cost);
+                let minCost = validPlaces[0].cost;
+                let closestPlaces = validPlaces.filter(p => p.cost === minCost);
+
+                return closestPlaces[Math.floor(Math.random() * closestPlaces.length)].key;
             }
+
+            // [시간 페이크] -15 ~ +15분 랜덤 적용
+            getFakeTime(hour, minute) {
+                let offset = Math.floor(Math.random() * 31) - 15;
+                let totalMins = hour * 60 + minute + offset;
+                if (totalMins < 0) totalMins += 24 * 60;
+                let h = Math.floor(totalMins / 60) % 24;
+                let m = totalMins % 60;
+                return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+            }
+
             getSortedDesires(char, timeState) {
                 let desires = [];
                 const isWeekday = !["토", "일"].includes(timeState.dow);
-                const hour = parseInt(timeState.timeStr.split(':')[0]);
-                
+                const hour = timeState.hour;
                 desires.push({ name: "수업", score: (isWeekday && hour >= 9 && hour < 16) ? 50 : 0, target: null });
                 desires.push({ name: "식욕", score: Math.pow(char._hunger / 10, 2), target: null });
                 desires.push({ name: "요의", score: Math.pow(char._stomach / 10, 2), target: null });
                 desires.push({ name: "수면욕", score: Math.pow(char._fatigue / 10, 2), target: null });
-
+                
                 let maxAff = 0, targetLover = null;
                 for (const [t, v] of Object.entries(char.affection)) if (v > maxAff) { maxAff = v; targetLover = t; }
                 let maxAnti = 0, targetEnemy = null;
                 for (const [t, v] of Object.entries(char.antipathy)) if (v > maxAnti) { maxAnti = v; targetEnemy = t; }
-
+                
                 desires.push({ name: "애욕", score: maxAff * 0.4, target: targetLover });
                 desires.push({ name: "증오", score: maxAnti * 0.4, target: targetEnemy });
                 return desires.sort((a, b) => b.score - a.score);
             }
+
             pickAction(pool) { return pool[Math.floor(Math.random() * pool.length)]; }
-            
-            processOneHour() {
+            actionStudy() { return "수업을 들었다."; }
+            actionEat(char) { char._hunger = 0; return "허기를 채웠다."; }
+            actionToilet(char) { char._stomach = 0; return "화장실을 다녀왔다."; }
+            actionGlance(char, targetId, intents) {
+                let targetIntent = intents[targetId];
+                char.cooldowns.glance = 3;
+                if (targetIntent && !targetIntent.isSleepingTick && targetIntent.primary.name === "수업" && targetIntent.secondary.name === "애욕" && targetIntent.secondary.target && targetIntent.secondary.target !== char.id) {
+                    let rivalId = targetIntent.secondary.target;
+                    this.chars.modifyRelationship(char.id, 'antipathy', rivalId, 1);
+                    if (char.id === "jihye") this.chars.modifyJihyeStat('_mental', -3);
+                }
+                return `[${this.chars.getCharacter(targetId).name}]을(를) 곁눈질했다.`;
+            }
+            actionAffection(char, targetId, occupants) {
+                let targetOcc = occupants.find(o => o.char.id === targetId && !o.isSleepingTick);
+                if (targetOcc) {
+                    let reactScore = this.chars.getRelationship(targetId, 'affection', char.id) - this.chars.getRelationship(targetId, 'antipathy', char.id);
+                    if (reactScore > 0) this.chars.modifyRelationship(targetId, 'affection', char.id, Math.min(reactScore, 5));
+                    else if (reactScore < 0) this.chars.modifyRelationship(targetId, 'antipathy', char.id, Math.min(Math.abs(reactScore), 5));
+                }
+                return `[${this.chars.getCharacter(targetId).name}]에게 무언가를 시도했다.`;
+            }
+            actionHatred(char, targetId) { return `[${this.chars.getCharacter(targetId).name}]에게 적대적으로 행동했다!`; }
+
+            generateStatusReport(activeChars) {
+                let lines = ["📢 [매일 아침 9시: 캐릭터 관계도 브리핑]"];
+                activeChars.forEach(char => {
+                    let affs = [], antis = [];
+                    for (const [t, v] of Object.entries(char.affection)) if(v>0) affs.push(`${this.chars.getCharacter(t).name}(${v})`);
+                    for (const [t, v] of Object.entries(char.antipathy)) if(v>0) antis.push(`${this.chars.getCharacter(t).name}(${v})`);
+                    lines.push(`- [${char.name}] 호감: ${affs.length>0 ? affs.join(", ") : "없음"} | 반감: ${antis.length>0 ? antis.join(", ") : "없음"}`);
+                });
+                return lines.join("\n");
+            }
+
+            // [핵심] 내부 1시간 연산 코어
+            processOneTick() {
                 this.calendar.addMinutes(60);
                 const timeState = this.calendar.getCurrentState();
+                const fakeTimeStr = this.getFakeTime(timeState.hour, timeState.minute);
                 const activeChars = [this.chars.jihye, ...this.chars.getActiveNPCs(timeState)];
-                
-                let turnLogs = [];
-                // 시간 구분선 (구분을 위해 클래스 별도 부여)
-                turnLogs.push({ type: "time", text: `=== [${timeState.year}년차 ${timeState.month}월 ${timeState.day}일 ${timeState.dow}요일 ${timeState.timeStr}] ===` });
                 let intents = {};
 
                 activeChars.forEach(char => {
+                    if (char.cooldowns.glance > 0) char.cooldowns.glance--;
+                    if (char.isSleeping) {
+                        this.chars.modifyVital(char.id, '_fatigue', -8); char.sleepTimer--;
+                        let wokeUp = false;
+                        if (char.sleepTimer <= 0 || char._fatigue <= 0) { char.isSleeping = false; wokeUp = true; }
+                        intents[char.id] = { char, isSleepingTick: true, wokeUp: wokeUp, dest: char.currentLocation, sleepType: char.sleepType };
+                        return; 
+                    }
+
                     this.chars.modifyVital(char.id, '_hunger', 5);
                     this.chars.modifyVital(char.id, '_fatigue', 5);
-
                     let sorted = this.getSortedDesires(char, timeState);
-                    let primary = sorted[0];
-                    let secondary = sorted[1];
+                    let primary = sorted[0], secondary = sorted[1];
+                    if (primary.name === "애욕" && primary.target && this.chars.getRelationship(char.id, 'antipathy', primary.target) >= 31) primary.name = "증오";
 
-                    if (primary.name === "애욕" && primary.target) {
-                        if (this.chars.getRelationship(char.id, 'antipathy', primary.target) >= 31) primary.name = "증오";
+                    let targetDest = "길거리";
+                    if (primary.name === "수업") targetDest = "학교";
+                    else if (primary.name === "식욕") targetDest = this.findLocationWithTag("음식", char, timeState);
+                    else if (primary.name === "요의") targetDest = this.findLocationWithTag("용변", char, timeState);
+                    else if (primary.name === "수면욕") targetDest = this.findLocationWithTag("수면", char, timeState);
+
+                    if ((primary.name === "애욕" || primary.name === "증오") && primary.target) {
+                        let targetChar = this.chars.getCharacter(primary.target);
+                        if (targetChar) targetDest = targetChar.destination || targetChar.currentLocation;
                     }
 
-                    let dest = "길거리";
-                    if (primary.name === "수업") dest = "학교";
-                    else if (primary.name === "식욕") dest = this.findLocationWithTag("음식");
-                    else if (primary.name === "요의") dest = "화장실";
-                    else if (primary.name === "수면욕") dest = this.findLocationWithTag("수면");
-
-                    intents[char.id] = { char, primary, secondary, dest };
+                    if (char.currentLocation !== targetDest && char.travelTimeLeft <= 0) {
+                        let currArea = this.places.locations[char.currentLocation] ? this.places.locations[char.currentLocation].area : "Street";
+                        let targetArea = this.places.locations[targetDest] ? this.places.locations[targetDest].area : "Street";
+                        let dist = this.getAreaDistance(currArea, targetArea);
+                        
+                        if (dist > 0) {
+                            char.destination = targetDest;
+                            char.travelTimeLeft = dist;
+                            char.currentLocation = "길거리";
+                        } else {
+                            char.currentLocation = targetDest;
+                        }
+                    }
+                    intents[char.id] = { char, primary, secondary, targetDest };
                 });
+
+                let jihyeLoc = this.chars.jihye.currentLocation;
+                let isLocChanged = (jihyeLoc !== this.lastJihyeLocation);
+                this.lastJihyeLocation = jihyeLoc;
+                
+                let jihyeActionText = "", jihyeSleepType = "", jihyeWokeUp = false;
+                let npcActionTexts = [];
+                let roomOccupants = activeChars.map(c => intents[c.id]).filter(o => o.char.currentLocation === jihyeLoc);
+                let otherNames = roomOccupants.filter(o => o.char.id !== "jihye" && !o.isSleepingTick).map(o => o.char.name);
 
                 activeChars.forEach(char => {
-                    let intent = intents[char.id].primary;
-                    if ((intent.name === "애욕" || intent.name === "증오") && intent.target && intents[intent.target]) {
-                        intents[char.id].dest = intents[intent.target].dest; 
+                    let occ = intents[char.id];
+                    let isJihyeRoom = (char.currentLocation === jihyeLoc);
+                    let actionResult = "";
+
+                    if (occ.isSleepingTick) {
+                        actionResult = "수면";
+                        if (char.id === "jihye") { jihyeSleepType = occ.sleepType; jihyeWokeUp = occ.wokeUp; }
+                    } else if (char.travelTimeLeft > 0) {
+                        char.travelTimeLeft--;
+                        actionResult = `[${char.destination}]로 이동`;
+                        if (char.travelTimeLeft <= 0) {
+                            char.currentLocation = char.destination;
+                            char.destination = null;
+                        }
+                    } else {
+                        let { primary, secondary } = occ;
+                        if (primary.name === "수면욕") {
+                            let loc = this.places.locations[char.currentLocation];
+                            let hasBed = loc && loc.items.some(i => i.tags.includes("수면") && !i.isHidden && i.name.includes("침대"));
+                            char.isSleeping = true; char.sleepTimer = hasBed ? 6 : 3; char.sleepType = hasBed ? "침대" : "노상";
+                            if (char.id === "jihye" && char.sleepType === "노상") this.chars.modifyJihyeStat('_normalcy', -3);
+                            actionResult = "수면";
+                            if (char.id === "jihye") jihyeSleepType = char.sleepType;
+                        }
+                        else if (primary.name === "수업") {
+                            if (char.cooldowns.glance > 0) actionResult = this.actionStudy();
+                            else if (secondary.name === "애욕" && secondary.target) actionResult = this.actionGlance(char, secondary.target, intents);
+                            else actionResult = this.actionStudy();
+                        }
+                        else if (primary.name === "애욕" && primary.target) actionResult = this.actionAffection(char, primary.target, intents[primary.target] ? [intents[primary.target]] : roomOccupants);
+                        else if (primary.name === "증오" && primary.target) actionResult = this.actionHatred(char, primary.target);
+                        else if (primary.name === "식욕") actionResult = this.actionEat(char);
+                        else if (primary.name === "요의") actionResult = this.actionToilet(char);
                     }
-                    char.currentLocation = intents[char.id].dest; 
+
+                    if (char.id === "jihye") jihyeActionText = actionResult;
+                    else {
+                        if (!isLocChanged) {
+                            if (char.lastLocation !== jihyeLoc && char.currentLocation === jihyeLoc) npcActionTexts.push(`🚶 [${char.name}]이(가) 방금 들어왔다.`);
+                            else if (char.lastLocation === jihyeLoc && char.currentLocation !== jihyeLoc) npcActionTexts.push(`🚪 [${char.name}]이(가) 밖으로 나갔다.`);
+                        }
+                        if (isJihyeRoom && actionResult) {
+                            if (actionResult === "수면") {
+                                if (occ.primary && occ.primary.name === "수면욕") npcActionTexts.push(`💤 [${char.name}]은(는) 잠자리에 들었다.`);
+                                if (occ.wokeUp) npcActionTexts.push(`☀️ [${char.name}]은(는) 잠에서 깼다.`);
+                            } else npcActionTexts.push(`[${char.name}]은(는) ${actionResult}`);
+                        }
+                    }
                 });
 
-                let locGroups = {};
-                activeChars.forEach(char => {
-                    let loc = char.currentLocation;
-                    if (!locGroups[loc]) locGroups[loc] = [];
-                    locGroups[loc].push(intents[char.id]);
-                });
+                activeChars.forEach(c => c.lastLocation = c.currentLocation);
 
-                for (const [loc, occupants] of Object.entries(locGroups)) {
-                    let names = occupants.map(o => o.char.name).join(", ");
-                    if (occupants.some(o => o.char.id === "jihye")) {
-                        turnLogs.push({ type: "log", text: `📍 [${loc}] 에 지혜가 도착했다. (현재 인원: ${names})` });
-                    } else if (occupants.length > 1) {
-                        turnLogs.push({ type: "log", text: `📍 [${loc}] 에서 ${names}이(가) 마주쳤다.` });
-                    }
+                return {
+                    fakeTimeStr: fakeTimeStr, timeState: timeState, is9AM: (timeState.timeStr === "09:00"),
+                    location: jihyeLoc, isLocChanged: isLocChanged, otherNames: otherNames,
+                    jihyeAction: jihyeActionText, jihyeSleepType: jihyeSleepType, jihyeWokeUp: jihyeWokeUp,
+                    jihyeDest: this.chars.jihye.destination,
+                    npcActions: npcActionTexts, activeChars: activeChars
+                };
+            }
 
-                    occupants.forEach(occ => {
-                        let { char, primary, secondary } = occ;
+            // [출력] 1시간 연산을 그대로 UI 로그로 변환
+            processOneHour() {
+                let tick = this.processOneTick();
+                let logs = [];
 
-                        if (primary.name === "수업" && secondary.name === "애욕" && secondary.target) {
-                            let targetIntent = intents[secondary.target];
-                            let log = `[${char.name}] 은(는) 수업 중 [${this.chars.getCharacter(secondary.target).name}] 을(를) 곁눈질했다.`;
-                            
-                            if (targetIntent && targetIntent.secondary.name === "애욕" && targetIntent.secondary.target && targetIntent.secondary.target !== char.id) {
-                                let rivalId = targetIntent.secondary.target;
-                                let rivalName = this.chars.getCharacter(rivalId).name;
-                                log += ` 하지만 시선의 끝엔 [${rivalName}] 이(가) 있었다!`;
-                                this.chars.modifyRelationship(char.id, 'antipathy', rivalId, 1);
-                                if (char.id === "jihye") {
-                                    this.chars.modifyJihyeStat('_mental', -3);
-                                    log += ` (지혜 멘탈 -3, ${rivalName} 반감 +1)`;
-                                }
-                            }
-                            turnLogs.push({ type: "log", text: log });
-                        }
+                // 헤더 (페이크 시간 적용)
+                logs.push({ type: 'time', text: `=== [${tick.timeState.year}년차 ${tick.timeState.month}월 ${tick.timeState.day}일] ${tick.fakeTimeStr} ===` });
 
-                        if (primary.name === "애욕" && primary.target) {
-                            let aff = this.chars.getRelationship(char.id, 'affection', primary.target);
-                            let targetName = this.chars.getCharacter(primary.target).name;
-                            let action = aff <= 20 ? this.pickAction(["곁눈질", "눈인사"]) : aff <= 50 ? this.pickAction(["살가운 인사", "호감표현", "대화시도"]) : this.pickAction(["고백", "대놓고 쳐다보기", "스킨십 시도", "미행"]);
-
-                            turnLogs.push({ type: "log", text: `💞 [${char.name}] 은(는) [${targetName}] 에게 '${action}' 을(를) 시도했다.` });
-
-                            let targetOcc = occupants.find(o => o.char.id === primary.target);
-                            if (targetOcc) {
-                                let tId = targetOcc.char.id;
-                                let reactScore = this.chars.getRelationship(tId, 'affection', char.id) - this.chars.getRelationship(tId, 'antipathy', char.id);
-                                if (reactScore > 0) {
-                                    let inc = Math.min(reactScore, 5);
-                                    this.chars.modifyRelationship(tId, 'affection', char.id, inc);
-                                    turnLogs.push({ type: "log", text: `   -> [${targetName}] 도 미소를 보였다. (애정 +${inc})` });
-                                } else if (reactScore < 0) {
-                                    let inc = Math.min(Math.abs(reactScore), 5);
-                                    this.chars.modifyRelationship(tId, 'antipathy', char.id, inc);
-                                    turnLogs.push({ type: "log", text: `   -> [${targetName}] 은(는) 불쾌해했다. (반감 +${inc})` });
-                                } else {
-                                    turnLogs.push({ type: "log", text: `   -> [${targetName}] 은(는) 별다른 반응이 없었다.` });
-                                }
-                            }
-                        }
-
-                        if (primary.name === "증오" && primary.target) {
-                            let anti = this.chars.getRelationship(char.id, 'antipathy', primary.target);
-                            let targetName = this.chars.getCharacter(primary.target).name;
-                            let action = anti <= 50 ? this.pickAction(["비난", "회피", "거절"]) : this.pickAction(["뺨때리기", "침뱉기"]);
-                            turnLogs.push({ type: "log", text: `💢 [${char.name}] 은(는) [${targetName}] 에게 '${action}' 을(를) 했다!` });
-                        }
-
-                        if (primary.name === "식욕") { char._hunger = 0; if(char.id === "jihye") turnLogs.push({ type: "log", text: `🍔 지혜는 허기를 채웠다.` }); }
-                        if (primary.name === "요의") { char._stomach = 0; if(char.id === "jihye") turnLogs.push({ type: "log", text: `🚽 지혜는 화장실을 다녀왔다.` }); }
-                        if (primary.name === "수면욕") { char._fatigue = 0; if(char.id === "jihye") turnLogs.push({ type: "log", text: `💤 지혜는 잠을 잤다.` }); }
-                    });
+                // 정각 9시 브리핑 (내부 시간 기준)
+                if (tick.is9AM) {
+                    logs.push({ type: 'status', text: this.generateStatusReport(tick.activeChars) });
                 }
-                return turnLogs;
+
+                // 장소 도착/변경 로그
+                if (tick.isLocChanged) {
+                    let others = tick.otherNames.length > 0 ? tick.otherNames.join(", ") : "없음";
+                    logs.push({ type: 'log', text: `📍 지혜는 [${tick.location}]에 도착했다. (현재 인원: ${others})` });
+                }
+
+                // 지혜의 행동 문장 다듬기
+                let jAction = tick.jihyeAction;
+                if (jAction === "수면") jAction = tick.jihyeSleepType === "침대" ? "침대에서 잠을 자고 있다." : "노상에서 쪽잠을 자고 있다.";
+                else if (jAction.includes("로 이동")) jAction = jAction.replace("로 이동", "를 향해 걷고 있다.");
+
+                logs.push({ type: 'log', text: `지혜는 ${jAction}` });
+
+                // 방 안의 NPC 행동 출력
+                if (tick.jihyeWokeUp) logs.push({ type: 'log', text: `☀️ 지혜는 잠에서 깼다.` });
+                tick.npcActions.forEach(nAct => logs.push({ type: 'log', text: nAct }));
+
+                return logs;
             }
         }
 
         // ==========================================
-        // 2. DOM 요소 연결 및 초기화
+        // 5. DOM 및 이벤트 바인딩
         // ==========================================
-        const screen1 = document.getElementById('screen1');
-        const screen2 = document.getElementById('screen2');
-        const overlay = document.getElementById('overlay');
-        const startBtn = document.getElementById('start-btn');
-        const gearBtn = document.getElementById('gear-btn');
-        const homeBtn = document.getElementById('home-btn');
-        const animImg = document.getElementById('anim-img');
-        const bottomBox = document.getElementById('bottom-box');
+        const screen1 = document.getElementById('screen1'); const screen2 = document.getElementById('screen2');
+        const overlay = document.getElementById('overlay'); const startBtn = document.getElementById('start-btn');
+        const gearBtn = document.getElementById('gear-btn'); const homeBtn = document.getElementById('home-btn');
+        const animImg = document.getElementById('anim-img'); const bottomBox = document.getElementById('bottom-box');
 
-        // 엔진 인스턴스 생성
-        const calendarSys = new GameCalendar();
-        const placeSys = new PlaceManager();
-        const characterSys = new CharacterManager();
-        const gameEngine = new TurnEngine(calendarSys, characterSys, placeSys);
+        const gameEngine = new TurnEngine(new GameCalendar(), new CharacterManager(), new PlaceManager());
 
-        // 상단 애니메이션
         const frame1 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADPElEQVR4AexZMY7UQBDsvhcAAn6ARM4TSCBEAmJ0b4CAgIQAhMgJTmgRCQE8AJ6CRESEBBI8wbjWLsk7t3P2eapnLa1XW2pPT09Nd/WMg92TzWbTHDNO7Mg/qwBHfgBsPQHrCaiswI+vn20KaqW1XoFaSrPrU/e7bPxU3jRuPQGpIupxaSdL14/Vs56AMYXmzqs7p+ZjXesJoBIqG9Up5qfmP7oTQCFpqwnw6t0nA7gxnoF0DB9Af7StJkB0IXP5wwV4/eWbAX7jmgF4Bpgwug1gbgjEAIyLsuECRCWu4pUJkHs7N3/+2j6kBeyLgS+NU49lAqgTq8UnFwD3GWABw3uNZ7t+1bZgQG8xN8Q2BrH9fGpyJy6NGxvLBRjbcGnzcgHYRZwCIC3Y3c3dU/e5sbtv48ABnAsQOeQCiPKqRiMX4PmjewbwJPw7O7Mh8GYH0grh2wfypPGqsVwAVWK1eMIFuPLgoQ2hKuzW/ccGlPKFC1CaYPR6mQDoBsCE8R4AcneYflquo6UfHAD9aisTQJ2Yim+MJ1wAdA9gR5lQ+sann3FYA9AfZcMFiEpcxVtNAHQTYIdzFjGAqsAxnmoCjCVyqPlwAX7dvmtDpHef4ycv3hrA2FqChAtQq5C5+4QJgN/zgLmJ8SSAA5jLM7YuTICxjZcyLxcA3QJwn4EPL58a8ObjdwN+33lmgPUfPAOYAxAL9NPWNM0W4AToV1m5AKrEavEcTAB0HZhaaNRJOJgAUwuPjpMJcHp6agA7hXsM5Aq4+fO9Abn5Wn6ZALUSVu9TLAC6DrDz7t2vuWmi6PYQ7l3c0IdnrsPpATim5T7YE6B/ri0WYO7GUesuy1tdAPeu81MTdd+Nd98dT+XJxVUXIJfIofwyAdy7zvCO5griPG0ujn7GuXf8rd97tKb8KxOgPJXDMCxeAHff/kfYyuM9mtYCrSn/Ll6A8hIvZlisAO6+t/P8BenisqbPLlaA6SWURcoEYGfcu86579o0Tfdunn733THf/u087ntD/nYs/coEkGZVkSxMAHaQNq0p9afjND5qHCZAVMJq3jAB3HfvtDpxFV+YAKoEo3nkAkS9raOEkAsQlWiOt9T/HwAA///vEiDpAAAABklEQVQDACMxZC+LDHfjAAAAAElFTkSuQmCC";
         const frame2 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADRElEQVR4AexZMY7UQBDsvhcAAn6ARM4TSCBEAmK0b4CAgIQAhMgJTmgRCQE8AJ6CRESEBBL3BJ9r7ZK8cztnn109trQ+bal3uts13dUzDvZOttttdcw4sSP/WwU48gNg6wlYT0BhBX59/2pDUKqs9QqUUppTH7rfVfOH8qZ56wlIFVGvp05y6vN9/awnoE+hsXH15NR87Gs9AVRCZaMmxfrU/Ed3AigkbTEB3nz4YgA3xncgXcMH0B9tiwkQ3chY/nAB3n77YYDfumEAvgMsGNMGEOsCOQDzomy4AFGFq3hlAuTeztW//3YIaQOHcuBL89RrmQDqwkrxyQXAfQbYQPde47vdvG47MKG1iHWxy0FuG09N7sSleX1ruQB9Gy4tLheAU8QpANKG3d3cPXVfWLv7Lg8cwIUEkUMugKiuYjRyAV4+eWAAT8LZ6al1gTc7kHYI3yGQJ81XreUCqAorxRMuwLVHj62L3ERz/pwQdx4+NSAXH+oPF2BoIXPlyQTANAA2gvcAkE6W95x+Wvr5PP3gAOhXW5kA6sJUfH084QJgegAnyoI4cVr6mYdnAPqjbLgAUYWreIsJgGkCnHDOIgdQNdjHU0yAvkLmiocL8OfufeuCdz61z169N4C5pQQJF6BUI2P3CRMAv+cBYwvjSQAHMJan77kwAfo2XkpcLgCmBeA+A59ePzfg3eefBvy998IAa//wHUAMQC7Qhq2qqh3ACdCvsnIBVIWV4plNAEwdGNpo1EmYTYChjUfnyQTYbDYGcFK4x0Cugdu/PxqQi5fyywQoVbB6n8kCYOoAJ+/e/JqbFoppd+He5HV9+M7ncHoArmm5D/YE6B9rJwswduOo567KW1wA92byQwt13893318P5cnlFRcgV8hcfpkA7s1keEdzDTFOm8ujn3nuDX/t9xa1mf6RCTC9lHkYFi+Au+/+R1jL4y2q2gK1mf5ZvADTW7ycYbECuPvByfOXpMvbGh5drADDW5iWKROAk3FvJue+b9My3Zs4/e77a7796zjue0X+ei39yASQVlWQLEwATpA27Sn1p+s0P2odJkBUwWreMAHc9++0unAVX5gAqgKjeeQCRL2to4SQCxBVaI53qv8cAAD//xWLJWIAAAAGSURBVAMAFCxwL9ygUI0AAAAASUVORK5CYII=";
-        animImg.src = frame1;
-        let isFrame1 = true;
+       animImg.src = frame1; let isFrame1 = true;
         setInterval(() => { animImg.src = (isFrame1 = !isFrame1) ? frame1 : frame2; }, 500);
 
-        // 버튼 이벤트
         startBtn.addEventListener('click', () => {
-            screen1.classList.remove('active');
-            screen2.classList.add('active');
-            
-            // 시작 시 텍스트 박스 초기화
-            bottomBox.innerHTML = '<div class="log-item">SYSTEM: 로그 시스템 가동... 화면(아래 박스)을 터치하여 시간을 진행하세요.</div>';
+            screen1.classList.remove('active'); screen2.classList.add('active');
+            bottomBox.innerHTML = '<div class="log-item">SYSTEM: 로그 시스템 가동... 하단 박스를 터치하여 [1시간] 단위로 진행하세요.</div>';
         });
 
         gearBtn.addEventListener('click', () => overlay.classList.add('active'));
-        homeBtn.addEventListener('click', () => {
-            overlay.classList.remove('active');
-            screen2.classList.remove('active');
-            screen1.classList.add('active');
-        });
+        homeBtn.addEventListener('click', () => { overlay.classList.remove('active'); screen2.classList.remove('active'); screen1.classList.add('active'); });
 
-        // ==========================================
-        // 3. 핵심! 터치(클릭) 시 턴 진행
-        // ==========================================
         bottomBox.addEventListener('click', () => {
+            // [교체] 다시 1시간(1틱) 함수로 호출
             const logs = gameEngine.processOneHour();
-            
             logs.forEach(logObj => {
                 const logDiv = document.createElement('div');
-                // 시간 제목 부분은 스타일을 다르게 줍니다.
-                logDiv.className = logObj.type === 'time' ? 'log-item log-time' : 'log-item';
+                if (logObj.type === 'time') logDiv.className = 'log-item log-time';
+                else if (logObj.type === 'status') logDiv.className = 'log-status';
+                else logDiv.className = 'log-item';
+                
                 logDiv.innerText = logObj.text;
                 bottomBox.appendChild(logDiv);
             });
-
-            // 로그가 추가되면 맨 아래로 부드럽게 스크롤
-            bottomBox.scrollTo({
-                top: bottomBox.scrollHeight,
-                behavior: 'smooth'
-            });
+            bottomBox.scrollTo({ top: bottomBox.scrollHeight, behavior: 'smooth' });
         });
-
     </script>
 </body>
 </html>
