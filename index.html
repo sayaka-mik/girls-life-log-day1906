@@ -29,8 +29,6 @@
         
         .log-item { font-size: 0.95rem; color: #444; margin-bottom: 12px; line-height: 1.4; border-bottom: 1px dashed rgba(0,0,0,0.1); padding-bottom: 8px; }
         .log-time { font-weight: bold; color: #5F8575; border-bottom: none; margin-top: 15px; }
-        
-        /* 9시 로그 가독성을 높이기 위해 스타일 약간 수정 */
         .log-status { font-size: 0.82rem; background-color: #E8F0EA; color: #333; padding: 12px; border-radius: 8px; margin: 15px 0; white-space: pre-wrap; border-left: 4px solid #5F8575; line-height: 1.6; font-family: monospace;}
         
         #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); z-index: 10; display: none; justify-content: center; align-items: center; }
@@ -43,14 +41,12 @@
     <div id="game-container">
         <div id="screen1" class="screen active">
             <h1>GIRLS LIFE LOG<br>D1906</h1>
-            
             <div class="disp-box">
                 <div class="disp-title">지혜의 초기 성향 선택</div>
                 <button class="disp-btn" data-type="고상함">고상함</button>
                 <button class="disp-btn" data-type="활달함">활달함</button>
                 <button class="disp-btn" data-type="퇴폐적">퇴폐적</button>
             </div>
-
             <button id="start-btn">게임 시작</button>
         </div>
         <div id="screen2" class="screen">
@@ -70,7 +66,7 @@
 
     <script>
         // ==========================================
-        // 1. 달력 시스템 (GameCalendar)
+        // 1. 달력 시스템
         // ==========================================
         class GameCalendar {
             constructor() {
@@ -112,7 +108,6 @@
                 this.addEvent(this.getLastWeekday(y, 10, 3), "학교 축제");
                 for(let i=0; i<5; i++) this.addEvent(this.getNthWeekday(y, 11, 2, 1) + i, "기말고사");
                 this.addEvent(this.getNthWeekday(y, 12, 2, 5), "겨울방학 시작");
-                [{m:2,d:14,n:"발렌타인데이"},{m:3,d:14,n:"화이트데이"},{m:11,d:11,n:"빼빼로데이"},{m:12,d:25,n:"크리스마스"},{m:5,d:5,n:"지혜생일"},{m:10,d:17,n:"사유생일"},{m:2,d:28,n:"기택생일"}].forEach(a => this.addEvent(this.getDayIndex(y, a.m, a.d), a.n));
             }
             getCurrentState() {
                 const { year, month, day } = this.getDateFromIndex(this.currentDayIndex);
@@ -133,47 +128,40 @@
         }
 
         // ==========================================
-        // 2. 장소 관리 (PlaceManager)
+        // 2. 장소 관리
         // ==========================================
         class PlaceManager {
             constructor() {
                 this.locations = {
-                    "길거리": { area: "Street", name: "길거리(통로)", isReachable: true, items: [{ name: "돌멩이", tags: [] }, { name: "돗대", tags: ["일탈"] }, { name: "전단지", tags: [] }, { name: "담배꽁초", tags: [] }, { name: "5천원", tags: [], isHidden: true }] },
+                    "길거리": { area: "Street", name: "길거리(통로)", isReachable: true, items: [{ name: "돌멩이", tags: [] }, { name: "돗대", tags: ["일탈"] }] },
                     "다빈의 집": { area: "A", name: "다빈의 집", ownerId: "dabin", isReachable: true, items: [{ name: "침대", tags: ["수면"] }, { name: "변기", tags: ["용변"] }, { name: "밥", tags: ["음식", "무한"] }] },
                     "유상의 집": { area: "A", name: "유상의 집", ownerId: "yusang", isReachable: true, items: [{ name: "침대", tags: ["수면"] }, { name: "변기", tags: ["용변"] }, { name: "밥", tags: ["음식", "무한"] }] },
-                    "학교": { area: "A", name: "학교", isReachable: true, items: [{ name: "책상", tags: ["공부"] }, { name: "의자", tags: [] }, { name: "일기장", tags: [], isHidden: true }] },
-                    "운동장": { area: "A", name: "학교 운동장", isReachable: true, items: [{ name: "모래", tags: [] }, { name: "송곳", tags: ["위협"], isHidden: true }] },
-                    "옥상": { area: "A", name: "학교 옥상", isReachable: true, items: [{ name: "담배꽁초", tags: [] }, { name: "비눗방울", tags: ["럭셔리"], isHidden: true }, { name: "죽은 고양이", tags: ["기현상"], isHidden: true }] },
+                    "학교": { area: "A", name: "학교", isReachable: true, items: [{ name: "책상", tags: ["공부"] }] },
+                    "운동장": { area: "A", name: "학교 운동장", isReachable: true, items: [{ name: "모래", tags: [] }] },
+                    "옥상": { area: "A", name: "학교 옥상", isReachable: true, items: [{ name: "담배꽁초", tags: [] }] },
                     "급식실": { area: "A", name: "학교 급식실", isReachable: true, items: [{ name: "급식", tags: ["음식"] }] },
                     "남자화장실": { area: "A", name: "학교 남자화장실", isReachable: true, items: [{ name: "변기", tags: ["용변", "남자"] }] },
                     "여자화장실": { area: "A", name: "학교 여자화장실", isReachable: true, items: [{ name: "변기", tags: ["용변", "여자"] }] },
-                    "지혜의 집": { area: "B", name: "지혜의 집", ownerId: "jihye", isReachable: true, items: [{ name: "침대", tags: ["수면"] }, { name: "텅 빈 어항", tags: [] }, { name: "가위", tags: ["위협"] }, { name: "유통기한 지난 향수", tags: ["치장"] }, { name: "변기", tags: ["용변"] }, { name: "밥", tags: ["음식", "무한"] }] },
+                    "지혜의 집": { area: "B", name: "지혜의 집", ownerId: "jihye", isReachable: true, items: [{ name: "침대", tags: ["수면"] }, { name: "가위", tags: ["위협"] }, { name: "변기", tags: ["용변"] }, { name: "밥", tags: ["음식", "무한"] }] },
                     "사유의 집": { area: "B", name: "사유의 집", ownerId: "sayu", isReachable: true, items: [{ name: "사유의 일기장", tags: ["학용품"] }, { name: "침대", tags: ["수면"] }, { name: "변기", tags: ["용변"] }, { name: "밥", tags: ["음식", "무한"] }] },
                     "기택의 집": { area: "B", name: "기택의 집", ownerId: "gitaek", isReachable: true, items: [{ name: "침대", tags: ["수면"] }, { name: "변기", tags: ["용변"] }, { name: "밥", tags: ["음식", "무한"] }] },
-                    "편의점B": { area: "B", name: "편의점B", isReachable: true, items: [{ name: "햄버거", tags: ["음식"] }, { name: "삼각김밥", tags: ["음식"] }, { name: "콜라", tags: ["음료"] }, { name: "캔맥주", tags: ["음료", "일탈"] }] },
-                    "뒷산": { area: "B", name: "뒷산", isReachable: true, items: [{ name: "고라니", tags: ["위협"] }, { name: "쥐덫", tags: ["위협"] }] },
-                    "공터": { area: "B", name: "공터", isReachable: true, items: [{ name: "파이프", tags: ["위협"] }, { name: "축구공", tags: [] }] },
+                    "편의점B": { area: "B", name: "편의점B", isReachable: true, items: [{ name: "햄버거", tags: ["음식"] }, { name: "콜라", tags: ["음료"] }, { name: "캔맥주", tags: ["음료", "일탈"] }] },
                     "미나의 집": { area: "C", name: "미나의 집", ownerId: "mina", isReachable: true, items: [{ name: "침대", tags: ["수면"] }, { name: "변기", tags: ["용변"] }, { name: "밥", tags: ["음식", "무한"] }] },
                     "신우의 집": { area: "C", name: "신우의 집", ownerId: "shinwoo", isReachable: true, items: [{ name: "침대", tags: ["수면"] }, { name: "변기", tags: ["용변"] }, { name: "밥", tags: ["음식", "무한"] }] },
-                    "도서관": { area: "C", name: "도서관", isReachable: true, items: [{ name: "죄와 벌", tags: ["어려운 책", "공부"] }, { name: "인간실격", tags: ["기괴한 책"] }] },
+                    "도서관": { area: "C", name: "도서관", isReachable: true, items: [{ name: "죄와 벌", tags: ["어려운 책", "공부"] }] },
                     "지하철역": { area: "C", name: "지하철역", isReachable: true, items: [{ name: "삐라", tags: ["일탈"] }] },
-                    "서점": { area: "C", name: "서점", isReachable: true, items: [{ name: "소설", tags: ["학용품"] }] },
                     "레스토랑": { area: "C", name: "레스토랑", isReachable: true, items: [{ name: "스테이크", tags: ["음식"] }] },
-                    "유원지": { area: "C", name: "유원지", isReachable: true, items: [{ name: "관람차", tags: ["행복"] }] },
-                    "헬스장": { area: "C", name: "헬스장", isReachable: true, items: [{ name: "런닝머신", tags: [] }, { name: "무료 프로틴", tags: ["음료"] }] },
-                    "폐건물": { area: "D", name: "폐건물", isReachable: true, items: [{ name: "깨진 유리조각", tags: ["위협"] }, { name: "더러운 봉제인형", tags: ["로맨틱", "기현상"] }] },
-                    "편의점D": { area: "D", name: "편의점D", isReachable: true, items: [{ name: "햄버거", tags: ["음식"] }, { name: "콜라", tags: ["음료"] }] },
+                    "헬스장": { area: "C", name: "헬스장", isReachable: true, items: [{ name: "런닝머신", tags: [] }] },
+                    "폐건물": { area: "D", name: "폐건물", isReachable: true, items: [{ name: "깨진 유리조각", tags: ["위협"] }] },
                     "천체관측소": { area: "D", name: "천체관측소", isReachable: true, items: [{ name: "플라네타리움", tags: ["럭셔리"] }] },
                     "앨리스의 집": { area: "E", name: "앨리스의 집", ownerId: "alice", isReachable: false, items: [{ name: "침대", tags: ["수면"] }, { name: "변기", tags: ["용변"] }, { name: "밥", tags: ["음식", "무한"] }] },
-                    "기택의 학원": { area: "E", name: "기택의 학원", ownerId: "gitaek", isReachable: true, items: [{ name: "문제집", tags: ["공부"] }] },
-                    "외계인의 집": { area: "E", name: "울툼쿠라피의 집", isReachable: false, items: [{ name: "안티키테라 기계", tags: ["기현상"] }] },
-                    "지옥": { area: "E", name: "지옥", isReachable: false, items: [{ name: "원죄 자국", tags: ["기현상"] }] }
+                    "기택의 학원": { area: "E", name: "기택의 학원", ownerId: "gitaek", isReachable: true, items: [{ name: "문제집", tags: ["공부"] }] }
                 };
             }
         }
 
         // ==========================================
-        // 3. 캐릭터 시스템
+        // 3. 캐릭터 시스템 (월경 판정 등 반영)
         // ==========================================
         class CharacterManager {
             constructor() {
@@ -200,35 +188,31 @@
 
             setJihyeDisposition(type) {
                 this.jihye.disposition = type;
-                if (type === "고상함") {
-                    this.jihye.preferredLocation = ["도서관"];
-                    this.jihye.modifiers = { drain: "_health", defense: "_normalcy" };
-                } else if (type === "활달함") {
-                    this.jihye.preferredLocation = ["헬스장"];
-                    this.jihye.modifiers = { drain: "_mental", defense: "_health" };
-                } else if (type === "퇴폐적") {
-                    this.jihye.preferredLocation = ["레스토랑"];
-                    this.jihye.modifiers = { drain: "_normalcy", defense: "_mental" };
-                }
+                if (type === "고상함") { this.jihye.preferredLocation = ["도서관"]; this.jihye.modifiers = { drain: "_health", defense: "_normalcy" }; } 
+                else if (type === "활달함") { this.jihye.preferredLocation = ["헬스장"]; this.jihye.modifiers = { drain: "_mental", defense: "_health" }; } 
+                else if (type === "퇴폐적") { this.jihye.preferredLocation = ["레스토랑"]; this.jihye.modifiers = { drain: "_normalcy", defense: "_mental" }; }
             }
 
             getCharacter(id) { return id === "jihye" ? this.jihye : this.npcs.find(n => n.id === id); }
             getActiveNPCs(currentDateState) { return this.npcs.filter(npc => npc.isActive(this.jihye, currentDateState)); }
             
-            modifyJihyeStat(statName, amount) { 
+            // [수정] 지혜 스탯 증감 함수 (월경 및 성향 보정 완벽 적용)
+            modifyJihyeStat(statName, amount, currentDay) { 
+                if (currentDay >= 3 && currentDay <= 8) amount *= 2; // 월경 기간 2배
                 if (amount < 0 && this.jihye.modifiers) {
                     if (this.jihye.modifiers.drain === statName) amount *= 2; 
                     if (this.jihye.modifiers.defense === statName) amount = Math.ceil(amount / 2); 
                 }
                 this.jihye[statName] = this.clamp(this.jihye[statName] + amount, statName === "_normalcy" ? -100 : -10, 100); 
             }
+
             modifyVital(charId, statName, amount) { let char = this.getCharacter(charId); if (char) char[statName] = this.clamp(char[statName] + amount, 0, 100); }
             modifyRelationship(fromId, type, toId, amount) { let char = this.getCharacter(fromId); if (char) char[type][toId] = this.clamp((char[type][toId] || 0) + amount, type === "affection" ? -10 : 0, 100); }
             getRelationship(fromId, type, toId) { let char = this.getCharacter(fromId); return char && char[type][toId] ? char[type][toId] : 0; }
         }
 
         // ==========================================
-        // 4. 턴 엔진
+        // 4. 턴 엔진 (이벤트/호사가 등 내부 로직 반영)
         // ==========================================
         class TurnEngine {
             constructor(calendarSys, characterSys, placeSys) {
@@ -256,13 +240,11 @@
 
                 for (const [key, loc] of Object.entries(this.places.locations)) {
                     if (!loc.isReachable) continue;
-
                     if (loc.ownerId) {
                         let ownerObj = this.chars.getCharacter(loc.ownerId);
                         if (loc.ownerId !== "jihye" && ownerObj && ownerObj.isActive && !ownerObj.isActive(this.chars.jihye, timeState)) continue;
                         if (loc.ownerId !== char.id && this.chars.getRelationship(loc.ownerId, 'affection', char.id) < 40) continue;
                     }
-
                     let hasTag = loc.items.some(item => {
                         if (!item.tags.includes(tag) || item.isHidden) return false;
                         if (tag === "용변") {
@@ -271,13 +253,13 @@
                         }
                         return true;
                     });
-
                     if (hasTag) {
                         let cost = (currLocName === key) ? -1 : (this.getAreaDistance(currArea, loc.area) === 0 ? (loc.name.includes(currLocName.split(" ")[0]) ? 0.1 : 0.5) : this.getAreaDistance(currArea, loc.area));
+                        // 내 집 최우선 법칙
+                        if (loc.ownerId === char.id) cost -= 1;
                         validPlaces.push({ key: key, cost: cost });
                     }
                 }
-
                 if (validPlaces.length === 0) return tag === "수면" ? "길거리" : "편의점B";
                 validPlaces.sort((a, b) => a.cost - b.cost);
                 let minCost = validPlaces[0].cost;
@@ -325,14 +307,11 @@
 
             pickAction(pool) { return pool[Math.floor(Math.random() * pool.length)]; }
 
-            // [수정] 9시 로그 개편 (전체 인물 수치 공개 및 지혜 스탯)
             generateStatusReport() {
                 let allChars = [this.chars.jihye, ...this.chars.npcs];
                 let lines = ["📢 [매일 아침 9시: 상태 및 관계도 브리핑]"];
-                
                 lines.push(`🔹 [지혜 상태] 건강: ${this.chars.jihye._health} | 멘탈: ${this.chars.jihye._mental} | 정상사고: ${this.chars.jihye._normalcy}`);
                 lines.push("---------------------------------------");
-                
                 allChars.forEach(char => {
                     let affs = [], antis = [];
                     allChars.forEach(target => {
@@ -360,7 +339,6 @@
                     this.lastDayIndex = this.calendar.currentDayIndex;
                 }
 
-                // 1. 상태이상 틱 처리 및 목적지 탐색
                 activeChars.forEach(char => {
                     if (char.statuses.affectionSat > 0) char.statuses.affectionSat--;
                     if (char.statuses.hatredSat > 0) char.statuses.hatredSat--;
@@ -389,19 +367,15 @@
                     else if (primary.name === "요의") targetDest = this.findLocationWithTag("용변", char, timeState);
                     else if (primary.name === "수면욕") targetDest = this.findLocationWithTag("수면", char, timeState);
 
-                    // [수정] 미행 시 권한 체크 추가
                     if ((primary.name === "애욕" || primary.name === "증오") && primary.target) {
                         let targetChar = this.chars.getCharacter(primary.target);
                         if (targetChar) {
                             let tDest = targetChar.destination || targetChar.currentLocation;
                             let locObj = this.places.locations[tDest];
                             let canEnter = true;
-                            
                             if (locObj) {
-                                if (locObj.area === "E" && locObj.ownerId !== char.id) canEnter = false; // 격리구역 차단
-                                else if (locObj.ownerId && locObj.ownerId !== char.id) {
-                                    if (this.chars.getRelationship(locObj.ownerId, 'affection', char.id) < 40) canEnter = false; // 사유지 차단
-                                }
+                                if (locObj.area === "E" && locObj.ownerId !== char.id) canEnter = false; 
+                                else if (locObj.ownerId && locObj.ownerId !== char.id && this.chars.getRelationship(locObj.ownerId, 'affection', char.id) < 40) canEnter = false; 
                             }
                             if (canEnter) targetDest = tDest;
                         }
@@ -411,7 +385,6 @@
                         let currArea = this.places.locations[char.currentLocation] ? this.places.locations[char.currentLocation].area : "Street";
                         let targetArea = this.places.locations[targetDest] ? this.places.locations[targetDest].area : "Street";
                         let dist = this.getAreaDistance(currArea, targetArea);
-                        
                         if (dist > 0) {
                             char.destination = targetDest;
                             char.travelTimeLeft = dist;
@@ -425,6 +398,28 @@
 
                 let jihyeLoc = this.chars.jihye.currentLocation;
                 let isLocChanged = (jihyeLoc !== this.lastJihyeLocation);
+                
+                // --- [신규] 이벤트 및 스탯 관리 판정 ---
+                // 1. 헬스장 도착 시 건강 증가
+                if (isLocChanged && jihyeLoc === "헬스장") this.chars.modifyJihyeStat('_health', 2, timeState.day);
+                
+                // 2. 평일 11시 정상등교 판정
+                const isWeekday = !["토", "일"].includes(timeState.dow);
+                if (isWeekday && timeState.hour === 11) {
+                    if (jihyeLoc !== "학교") {
+                        this.chars.modifyJihyeStat('_normalcy', -3, timeState.day);
+                        let gitaekObj = this.chars.getCharacter("gitaek");
+                        if (gitaekObj && gitaekObj.currentLocation === "학교") {
+                            this.chars.modifyRelationship("gitaek", "antipathy", "jihye", 2);
+                        }
+                    }
+                }
+                
+                // 3. 매일 18시 건강관리 판정
+                if (timeState.hour === 18) {
+                    if (this.chars.jihye._hunger >= 30) this.chars.modifyJihyeStat('_health', -2, timeState.day);
+                }
+
                 this.lastJihyeLocation = jihyeLoc;
                 
                 let jihyeActionText = "", jihyeWokeUp = false;
@@ -441,7 +436,7 @@
                     }
                 });
 
-                // 2. 행동 실행 및 내러티브 로그 수집
+                // 행동 실행
                 activeChars.forEach(char => {
                     let occ = intents[char.id];
                     let locName = char.currentLocation;
@@ -460,9 +455,16 @@
                         let locObj = this.places.locations[locName];
                         let itemsInRoom = locObj ? locObj.items : [];
 
+                        // 호사가 로직 (방 안에서 1회 속삭임 + 수치 계산)
                         if (char.id === "sayu" && isJihyeRoom && char.memory.length > 0) {
                             let gossip = char.memory.shift();
-                            actionResult = `사유는 다가와 속삭였다. "${gossip}"`;
+                            actionResult = `사유는 다가와 속삭였다. "${gossip.text}"`;
+                            
+                            let aAnti = this.chars.getRelationship(gossip.actorId, 'antipathy', 'jihye');
+                            let bAff = this.chars.getRelationship(gossip.targetId, 'affection', 'jihye');
+                            let aAff = this.chars.getRelationship(gossip.actorId, 'affection', 'jihye');
+                            if (aAnti >= 30 && bAff >= 30) this.chars.modifyJihyeStat('_mental', -2, timeState.day);
+                            else if (aAff >= 30 && bAff >= 30) this.chars.modifyJihyeStat('_mental', 2, timeState.day);
                         }
                         else if (primary.name === "수면욕") {
                             let bedCount = itemsInRoom.filter(i => i.tags.includes("수면") && !i.isHidden && i.name.includes("침대")).length;
@@ -473,7 +475,7 @@
                                 char.isSleeping = true; char.sleepTimer = 6; char.sleepType = "침대";
                             } else {
                                 char.isSleeping = true; char.sleepTimer = 3; char.sleepType = "노상";
-                                if (char.id === "jihye") this.chars.modifyJihyeStat('_normalcy', -3);
+                                if (char.id === "jihye") this.chars.modifyJihyeStat('_normalcy', -3, timeState.day);
                             }
                             actionResult = `${char.name}은(는) ${char.sleepType}에서 잤다.`;
                         }
@@ -543,7 +545,7 @@
                                     let actionName = anti <= 30 ? this.pickAction(["비난", "무시"]) : anti <= 50 ? this.pickAction(["회피", "거절"]) : this.pickAction(["뺨때리기", "침뱉기"]);
                                     
                                     char.statuses.hatredSat = 3;
-                                    if (primary.target === "jihye" && this.chars.jihye.statuses.shame > 0) this.chars.modifyJihyeStat('_mental', -5);
+                                    if (primary.target === "jihye" && this.chars.jihye.statuses.shame > 0) this.chars.modifyJihyeStat('_mental', -5, timeState.day);
                                     
                                     let targetName = targetOcc.char.name;
                                     actionResult = `${char.name}은(는) ${targetName}에게 ${actionName}을(를) 했다.\n   -> ${targetName}은(는) 기분이 나빠졌다.`;
@@ -551,6 +553,9 @@
                             } else {
                                 actionResult = `${char.name}은(는) ${locName}에서 시간을 보냈다.`;
                             }
+                        }
+                        else if (primary.name === "수업") {
+                            actionResult = `${char.name}은(는) 자리에 앉아 얌전히 공부했다.`;
                         }
                         else if (primary.name === "학원루틴") {
                             if (locName === "지하철역") {
@@ -583,7 +588,7 @@
                             let sayuObj = this.chars.getCharacter("sayu");
                             if (sayuObj && sayuObj.currentLocation === locName && sayuObj.travelTimeLeft <= 0) {
                                 let match = actionResult.match(/은\(는\) (.*?)에게 (.*?)을\(를\) 했다/);
-                                if(match) sayuObj.memory.push(`${char.name}이(가) ${match[1]}에게 ${match[2]}을(를) 했다더라.`);
+                                if(match) sayuObj.memory.push({ actorId: char.id, targetId: occ.primary.target, text: `${char.name}이(가) ${match[1]}에게 ${match[2]}을(를) 했다더라.` });
                             }
                         }
                     }
@@ -611,7 +616,6 @@
                 }
 
                 if (!tick.jihyeAction.includes("로 이동했다")) logs.push({ type: 'log', text: tick.jihyeAction });
-                
                 if (tick.jihyeWokeUp) logs.push({ type: 'log', text: `☀️ 지혜는 잠에서 깼다.` });
                 tick.npcActions.forEach(nAct => logs.push({ type: 'log', text: nAct }));
 
@@ -620,7 +624,7 @@
         }
 
         // ==========================================
-        // 5. DOM 및 이벤트 바인딩
+        // 5. DOM 및 이벤트
         // ==========================================
         const screen1 = document.getElementById('screen1'); const screen2 = document.getElementById('screen2');
         const overlay = document.getElementById('overlay'); const startBtn = document.getElementById('start-btn');
